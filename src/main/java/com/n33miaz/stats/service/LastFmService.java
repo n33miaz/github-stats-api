@@ -63,8 +63,7 @@ public class LastFmService {
                                     imgBase64,
                                     isPlaying,
                                     timeAgo,
-                                    0
-                    ));
+                                    0));
                 });
     }
 
@@ -106,11 +105,8 @@ public class LastFmService {
                 .retrieve()
                 .bodyToMono(LastFmResponse.class)
                 .flatMapMany(response -> Flux.fromIterable(response.topartists().artist()))
-                .flatMap(artist -> {
+                .concatMap(artist -> {
                     String imgUrl = getImageUrl(artist.images());
-                    if (imgUrl.contains("2a96cbd8b46e442fc41c2b86b821562f"))
-                        imgUrl = "";
-
                     return downloadImageAsBase64(imgUrl)
                             .map(base64 -> new SimpleItem(artist.name(), artist.playcount() + " plays", base64));
                 })
@@ -161,7 +157,7 @@ public class LastFmService {
         if (images == null)
             return "";
         return images.stream()
-                .filter(img -> "medium".equals(img.size()) || "large".equals(img.size()))
+                .filter(img -> "extra-large".equals(img.size()) || "large".equals(img.size()))
                 .findFirst()
                 .map(LastFmResponse.Image::url)
                 .orElse("");

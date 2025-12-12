@@ -115,53 +115,66 @@ public class SvgService {
     }
 
     // --- DASHBOARD DE MÚSICA ---
-    public String generateMusicDashboard(MusicDashboardData data, Map<String, String> colors, boolean hideBorder,
-            String periodText) {
+    public String generateMusicDashboard(MusicDashboardData data, java.util.Map<String, String> colors,
+            boolean hideBorder, String periodText) {
         String titleColor = colors.getOrDefault("title_color", "2f80ed");
         String textColor = colors.getOrDefault("text_color", "434d58");
         String iconColor = colors.getOrDefault("icon_color", "1DB954");
         String bgColor = colors.getOrDefault("bg_color", "fffefe");
         String borderColor = colors.getOrDefault("border_color", "e4e2e2");
 
-        // --- Música Atual ---
-        String coverImage = data.currentTrack().imageBase64().isEmpty()
-                ? renderDefaultDisk(140, 95, 50)
-                : String.format(
-                        "<image x=\"90\" y=\"45\" width=\"100\" height=\"100\" href=\"%s\" clip-path=\"url(#clip-main)\" class=\"album-art\"/>",
-                        data.currentTrack().imageBase64());
+        int dividerX = 340;
+        int col1X = dividerX + 30;
+        int col2X = dividerX + 250;
 
-        // Status
-        String statusText = data.currentTrack().isPlaying() ? "NOW PLAYING"
-                : data.currentTrack().timeAgo().toUpperCase();
+        // Configuração Esquerda (Imagem e Texto)
+        int leftCenter = dividerX / 2;
+        int imgSize = 120; // Tamanho aumentado
+        int imgX = 25; // Alinhado à esquerda
+        int imgY = 70; // Centralizado verticalmente na área útil
+        int textX = imgX + imgSize + 15; // Texto logo após a imagem
+
+        String coverImage = data.currentTrack().imageBase64().isEmpty()
+                ? renderDefaultDisk(imgX + (imgSize / 2), imgY + (imgSize / 2), imgSize / 2)
+                : String.format(
+                        "<image x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" href=\"%s\" clip-path=\"url(#clip-main)\" class=\"album-art\"/>",
+                        imgX, imgY, imgSize, imgSize, data.currentTrack().imageBase64());
+
+        String statusText = data.currentTrack().isPlaying() ? "NOW PLAYING" : "LAST PLAYED";
 
         // Equalizador
-        String equalizer = data.currentTrack().isPlaying() ? renderEqualizer(iconColor, 132, 155) : "";
+        String equalizer = data.currentTrack().isPlaying() ? renderEqualizer(iconColor, textX, 50) : "";
 
-        // Badge de plays da música
+        // Plays
         String playsBadge = data.currentTrack().userPlayCount() > 0
                 ? String.format(
                         """
-                                  <g transform="translate(115, 240)">
-                                      <rect x="0" y="0" width="50" height="16" rx="8" fill="#%s" fill-opacity="0.15"/>
-                                      <text x="25" y="11" text-anchor="middle" font-size="9" font-weight="bold" fill="#%s">%d plays</text>
+                                  <g transform="translate(%d, 240)">
+                                      <rect x="-50" y="0" width="100" height="20" rx="10" fill="#%s" fill-opacity="0.15"/>
+                                      <text x="0" y="14" text-anchor="middle" font-size="10" font-weight="bold" fill="#%s">%d plays</text>
                                   </g>
                                 """,
-                        titleColor, titleColor, data.currentTrack().userPlayCount())
+                        leftCenter, titleColor, titleColor, data.currentTrack().userPlayCount())
                 : "";
-
-        // --- Listas ---
-        int col1X = 310;
-        int col2X = 550;
 
         String artistsList = renderList(data.topArtists(), col1X, 70, true, textColor, iconColor, false);
         String albumsList = renderList(data.topAlbums(), col2X, 70, false, textColor, iconColor, true);
+
+        // Período
+        int rightCenter = dividerX + (800 - dividerX) / 2;
+        String periodBadge = String.format("""
+                    <g transform="translate(%d, 240)">
+                        <rect x="-40" y="0" width="80" height="20" rx="10" fill="#%s" fill-opacity="0.15"/>
+                        <text x="0" y="14" text-anchor="middle" font-size="10" font-weight="600" fill="#%s">%s</text>
+                    </g>
+                """, rightCenter, titleColor, titleColor, periodText);
 
         return """
                     <svg width="800" height="280" viewBox="0 0 800 280" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <style>
                             .header { font: 700 10px 'Segoe UI', Ubuntu, Sans-Serif; letter-spacing: 1.5px; fill: #%s; opacity: 0.8; }
-                            .title { font: 700 16px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
-                            .subtitle { font: 400 13px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; opacity: 0.9; }
+                            .title { font: 700 19px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
+                            .subtitle { font: 400 14px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; opacity: 0.9; }
                             .stat-title { font: 600 13px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
                             .stat-sub { font: 400 11px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; opacity: 0.7; }
                             .section-header { font: 700 12px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; text-transform: uppercase; letter-spacing: 1px; }
@@ -169,68 +182,66 @@ public class SvgService {
                             .fade-in { animation: fadeIn 0.8s ease-in-out forwards; opacity: 0; }
                             @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-                            .album-art { filter: drop-shadow(0px 8px 16px rgba(0,0,0,0.25)); }
+                            .album-art { filter: drop-shadow(0px 8px 16px rgba(0,0,0,0.3)); }
                         </style>
 
                         <rect x="0.5" y="0.5" rx="10" height="99%%" width="799" fill="#%s" stroke="#%s" stroke-opacity="%s" />
 
                         <defs>
-                            <clipPath id="clip-main"><rect x="90" y="45" width="100" height="100" rx="8" /></clipPath>
+                            <clipPath id="clip-main"><rect x="%d" y="%d" width="%d" height="%d" rx="6" /></clipPath>
                             <clipPath id="clip-circle"><circle cx="16" cy="16" r="16" /></clipPath>
                             <clipPath id="clip-square"><rect x="0" y="0" width="32" height="32" rx="4" /></clipPath>
                         </defs>
 
-                        <!-- Música Atual -->
+                        <!-- ESQUERDA -->
                         <g class="fade-in" style="animation-delay: 0.1s">
-                            <!-- Status -->
-                            <text x="140" y="30" text-anchor="middle" class="header">%s</text>
+                            <!-- Status Header -->
+                            <text x="%d" y="40" text-anchor="middle" class="section-header">%s</text>
 
-                            %s <!-- Capa -->
-                            %s <!-- Equalizador (se tocando) -->
+                            <!-- Cover Image -->
+                            %s
 
-                            <!-- Info -->
-                            <text x="140" y="185" text-anchor="middle" class="title">%s</text>
-                            <text x="140" y="205" text-anchor="middle" class="subtitle">%s</text>
+                            <!-- Track Info (Alinhado à esquerda da imagem) -->
+                            <text x="%d" y="120" text-anchor="start" class="title">%s</text>
+                            <text x="%d" y="145" text-anchor="start" class="subtitle">%s</text>
 
-                            %s <!-- Plays -->
+                            %s <!-- Equalizer -->
+                            %s <!-- Plays Badge -->
                         </g>
 
-                        <!-- DIVISÓRIA -->
-                        <line x1="280" y1="40" x2="280" y2="240" stroke="#%s" stroke-width="1" stroke-opacity="0.2" />
+                        <!-- DIVIDER -->
+                        <line x1="%d" y1="40" x2="%d" y2="240" stroke="#%s" stroke-width="1" stroke-opacity="0.2" />
 
-                        <!-- Listas -->
-
-                        <!-- Coluna 1: Top Artistas -->
+                        <!-- DIREITA -->
                         <g class="fade-in" style="animation-delay: 0.3s">
-                            <!-- Titulo centralizado em relação à coluna -->
                             <text x="%d" y="40" text-anchor="middle" class="section-header">Top Artists</text>
                             %s
                         </g>
 
-                        <!-- Coluna 2: Top Álbuns -->
                         <g class="fade-in" style="animation-delay: 0.5s">
                             <text x="%d" y="40" text-anchor="middle" class="section-header">Top Albums</text>
                             %s
                         </g>
 
-                        <!-- Rodapé: Período -->
-                        <text x="780" y="270" text-anchor="end" font-size="9" fill="#%s" opacity="0.5">%s</text>
+                        <!-- Período -->
+                        %s
 
                     </svg>
                 """
                 .formatted(
-                        titleColor, titleColor, textColor, 
-                        titleColor, textColor, textColor, 
-                        bgColor, borderColor, hideBorder ? "0" : "1", 
-                        statusText, coverImage, equalizer, 
-                        escapeHtml(truncate(data.currentTrack().name(), 28)),
-                        escapeHtml(truncate(data.currentTrack().artist(), 30)), 
-                        playsBadge,
-                        textColor, 
-                        col1X + 85, artistsList, 
-                        col2X + 85, albumsList, 
-                        textColor, periodText 
-                );
+                        titleColor, titleColor, textColor,
+                        titleColor, textColor, textColor,
+                        bgColor, borderColor, hideBorder ? "0" : "1",
+                        imgX, imgY, imgSize, imgSize,
+                        leftCenter, statusText,
+                        coverImage,
+                        textX, escapeHtml(truncate(data.currentTrack().name(), 22)),
+                        textX, escapeHtml(truncate(data.currentTrack().artist(), 25)),
+                        equalizer, playsBadge,
+                        dividerX, dividerX, textColor,
+                        col1X + 80, artistsList,
+                        col2X + 80, albumsList,
+                        periodBadge);
     }
 
     // --- HELPERS ---
@@ -254,7 +265,9 @@ public class SvgService {
                                     """,
                             color, initial);
                 } else {
-                    imgContent = "<rect width='32' height='32' fill='#333' rx='4'/>";
+                    imgContent = String.format(
+                            "<image width='32' height='32' href='%s' clip-path='url(#%s)' preserveAspectRatio='xMidYMid slice' />",
+                            item.imageBase64(), clipId);
                 }
             } else {
                 imgContent = String.format("<image width='32' height='32' href='%s' clip-path='url(#%s)' />",
