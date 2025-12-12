@@ -13,8 +13,7 @@ import java.util.Map;
 public class SvgService {
 
     private static final int REPO_CARD_WIDTH = 400;
-    private static final int REPO_LINE_HEIGHT = 20;
-    private static final int REPO_MAX_DESC_LINES = 3;
+    private static final int REPO_MAX_DESC_LINES = 2;
     private static final int REPO_MAX_CHARS_PER_LINE = 55;
 
     // --- TESTE ---
@@ -31,7 +30,7 @@ public class SvgService {
                 .formatted(escapeHtml(text));
     }
 
-    // --- CARD DE REPOSITÓRIO (PIN) ---
+    // --- CARD DE REPOSITÓRIO (PIN) - VERSÃO CORRIGIDA FINAL ---
     public String generateRepoCard(GithubResponse.Repository repo, Map<String, String> colors, boolean hideBorder) {
         String titleColor = colors.getOrDefault("title_color", "2f80ed");
         String iconColor = colors.getOrDefault("icon_color", "586069");
@@ -45,57 +44,107 @@ public class SvgService {
         String stars = kFormatter(repo.stargazerCount());
         String forks = kFormatter(repo.forkCount());
 
-        // altura dinâmica baseada no texto
+        int commitCount = (repo.object() != null && repo.object().history() != null)
+                ? repo.object().history().totalCount()
+                : 0;
+        String commits = kFormatter(commitCount);
+
         List<String> descLines = wrapText(description, REPO_MAX_CHARS_PER_LINE, REPO_MAX_DESC_LINES);
-        int descriptionHeight = descLines.size() * REPO_LINE_HEIGHT;
-        int totalHeight = (descLines.size() > 1 ? 120 : 110) + descriptionHeight;
-        int statusY = totalHeight - 25;
+
+        int paddingTop = 40;
+        int headerHeight = 25;
+        int descLineHeight = 22;
+        int descBlockHeight = Math.max(descLines.size() * descLineHeight, 20); 
+        int footerHeight = 40;
+        int paddingBottom = 15;
+
+        int totalHeight = paddingTop + headerHeight + descBlockHeight + footerHeight + paddingBottom;
+
+        int headerY = 35; 
+        int descStartY = headerY + 30;
+        int footerY = totalHeight - 20; 
+
+        int titleWidth = estimateTextWidth(repo.name());
+        int iconSize = 20;
+        int gapIconText = 10;
+        int totalHeaderWidth = iconSize + gapIconText + titleWidth;
+        int headerIconX = (REPO_CARD_WIDTH - totalHeaderWidth) / 2;
+        int headerTextX = headerIconX + iconSize + gapIconText;
 
         StringBuilder descSvg = new StringBuilder();
-        for (String line : descLines) {
-            descSvg.append(String.format("<tspan x=\"25\" dy=\"%s\">%s</tspan>", "1.2em", escapeHtml(line)));
+        for (int i = 0; i < descLines.size(); i++) {
+            int lineY = descStartY + (i * descLineHeight);
+            descSvg.append(String.format(
+                    "<text x=\"200\" y=\"%d\" text-anchor=\"middle\" class=\"desc\">%s</text>",
+                    lineY,
+                    escapeHtml(descLines.get(i))));
         }
 
         return """
                 <svg width="%d" height="%d" viewBox="0 0 %d %d" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <style>
-                        .header { font: 600 18px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
+                        .header { font: 700 18px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
                         .desc { font: 400 13px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
                         .stat { font: 600 12px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
                         .icon { fill: #%s; }
+
+                        .fade-in { opacity: 0; animation: fadeIn 0.6s ease-out forwards; }
+                        .d-1 { animation-delay: 0.1s; }
+                        .d-2 { animation-delay: 0.2s; }
+                        .d-3 { animation-delay: 0.3s; }
+
+                        @keyframes fadeIn {
+                            from { opacity: 0; transform: translateY(10px); }
+                            to { opacity: 1; transform: translateY(0); }
+                        }
                     </style>
 
-                    <rect x="0.5" y="0.5" rx="4.5" height="99%%" width="%d" fill="#%s" stroke="#%s" stroke-opacity="%s" />
+                    <rect x="0.5" y="0.5" rx="10" height="99%%" width="%d" fill="#%s" stroke="#%s" stroke-opacity="%s" />
 
-                    <g transform="translate(25, 35)">
-                        <svg class="icon" x="0" y="-13" viewBox="0 0 16 16" version="1.1" width="16" height="16">
-                            <path fill-rule="evenodd" d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z"></path>
+                    <!-- HEADER -->
+                    <g class="fade-in d-1">
+                        <svg class="icon" x="%d" y="%d" viewBox="0 0 16 16" width="20" height="20" margin="1">
+                            <path fill-rule="evenodd" d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z"/>
                         </svg>
-                        <text x="25" y="0" class="header">%s</text>
+                        <text x="%d" y="%d" class="header">%s</text>
                     </g>
 
-                    <g transform="translate(0, 45)">
-                        <text x="25" y="-5" class="desc">
-                            %s
-                        </text>
+                    <!-- DESCRIÇÃO -->
+                    <g class="fade-in d-2">
+                        %s
                     </g>
 
-                    <g transform="translate(30, %d)">
-                        <g transform="translate(0, 0)">
-                            <circle cx="0" cy="-5" r="6" fill="%s" />
-                            <text data-testid="lang-name" x="15" class="stat">%s</text>
-                        </g>
-                        <g transform="translate(%d, 0)">
-                            <svg class="icon" y="-12" viewBox="0 0 16 16" version="1.1" width="16" height="16">
-                                 <path fill-rule="evenodd" d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"></path>
+                    <!-- FOOTER -->
+                    <g class="fade-in d-3">
+
+                        <!-- ESQUERDA -->
+                        <!-- Linguagem -->
+                        <circle cx="30" cy="%d" r="5" fill="%s" />
+                        <text x="40" y="%d" class="stat">%s</text>
+
+                        <!-- Commits -->
+                        <g transform="translate(%d, %d)">
+                            <svg class="icon" y="-11" viewBox="0 0 16 16" width="14" height="14">
+                                <path fill-rule="evenodd" d="M10.5 7.75a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm1.43.75a4.002 4.002 0 01-7.86 0H.75a.75.75 0 110-1.5h3.32a4.001 4.001 0 017.86 0h3.32a.75.75 0 110 1.5h-3.32z"/>
                             </svg>
-                            <text x="25" class="stat">%s</text>
+                            <text x="18" class="stat">%s</text>
                         </g>
-                        <g transform="translate(%d, 0)">
-                            <svg class="icon" y="-12" viewBox="0 0 16 16" version="1.1" width="16" height="16">
-                                <path fill-rule="evenodd" d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z"></path>
+
+                        <!-- DIREITA -->
+                        <g transform="translate(365, %d)">
+                            <!-- Forks -->
+                            <text x="10" text-anchor="end" class="stat">%s</text>
+                            <svg class="icon" x="-15" y="-11" viewBox="0 0 16 16" width="14" height="14">
+                                <path fill-rule="evenodd" d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z"/>
                             </svg>
-                            <text x="25" class="stat">%s</text>
+
+                            <!-- Stars -->
+                            <g transform="translate(-45, 0)">
+                                <text x="12" text-anchor="end" class="stat">%s</text>
+                                <svg class="icon" x="-14" y="-11" viewBox="0 0 16 16" width="14" height="14">
+                                    <path fill-rule="evenodd" d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/>
+                                </svg>
+                            </g>
                         </g>
                     </g>
                 </svg>
@@ -104,14 +153,19 @@ public class SvgService {
                         REPO_CARD_WIDTH, totalHeight, REPO_CARD_WIDTH, totalHeight,
                         titleColor, textColor, textColor, iconColor,
                         REPO_CARD_WIDTH - 1, bgColor, borderColor, hideBorder ? "0" : "1",
+                        headerIconX, headerY - 15,
+                        headerTextX, headerY,
                         escapeHtml(repo.name()),
                         descSvg.toString(),
-                        statusY,
-                        langColor, escapeHtml(langName),
-                        estimateTextWidth(langName) + 25,
-                        stars,
-                        estimateTextWidth(langName) + estimateTextWidth(stars) + 60,
-                        forks);
+                        footerY - 5,
+                        langColor,
+                        footerY,
+                        escapeHtml(langName),
+                        40 + estimateTextWidth(langName) + 15, footerY,
+                        commits,
+                        footerY,
+                        forks,
+                        stars);
     }
 
     // --- DASHBOARD DE MÚSICA ---
@@ -127,12 +181,12 @@ public class SvgService {
         int col1X = dividerX + 30;
         int col2X = dividerX + 250;
 
-        // Configuração Esquerda (Imagem e Texto)
+        // (Imagem e Texto)
         int leftCenter = dividerX / 2;
-        int imgSize = 120; // Tamanho aumentado
-        int imgX = 25; // Alinhado à esquerda
-        int imgY = 70; // Centralizado verticalmente na área útil
-        int textX = imgX + imgSize + 15; // Texto logo após a imagem
+        int imgSize = 125;
+        int imgX = 25;
+        int imgY = 75;
+        int textX = imgX + imgSize + 15;
 
         String coverImage = data.currentTrack().imageBase64().isEmpty()
                 ? renderDefaultDisk(imgX + (imgSize / 2), imgY + (imgSize / 2), imgSize / 2)
@@ -235,7 +289,7 @@ public class SvgService {
                         imgX, imgY, imgSize, imgSize,
                         leftCenter, statusText,
                         coverImage,
-                        textX, escapeHtml(truncate(data.currentTrack().name(), 22)),
+                        textX, escapeHtml(truncate(data.currentTrack().name(), 19)),
                         textX, escapeHtml(truncate(data.currentTrack().artist(), 25)),
                         equalizer, playsBadge,
                         dividerX, dividerX, textColor,

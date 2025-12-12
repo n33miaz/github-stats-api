@@ -1,7 +1,5 @@
 package com.n33miaz.stats.dto;
 
-import java.util.Map;
-
 public record GithubResponse(Data data) {
     public record Data(Repository repository) {
     }
@@ -11,21 +9,18 @@ public record GithubResponse(Data data) {
             String description,
             int stargazerCount,
             int forkCount,
-            PrimaryLanguage primaryLanguage) {
+            PrimaryLanguage primaryLanguage,
+            ObjectData object) {
     }
 
     public record PrimaryLanguage(
             String name,
             String color) {
     }
-}
 
-class GraphqlRequestBody {
-    public String query;
-    public Map<String, Object> variables;
+    public record ObjectData(History history) {
+    }
 
-    public GraphqlRequestBody(String query, Map<String, Object> variables) {
-        this.query = query;
-        this.variables = variables;
+    public record History(int totalCount) {
     }
 }
