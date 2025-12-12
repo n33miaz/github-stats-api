@@ -43,7 +43,9 @@ public class StatsController {
             @RequestParam(required = false) String text_color,
             @RequestParam(required = false) String bg_color,
             @RequestParam(required = false) String border_color,
-            @RequestParam(defaultValue = "false") boolean hide_border) {
+            @RequestParam(defaultValue = "false") boolean hide_border,
+            @RequestParam(defaultValue = "true") boolean show_description
+    ) {
         Map<String, String> colors = new HashMap<>();
         if (title_color != null)
             colors.put("title_color", title_color);
@@ -58,8 +60,8 @@ public class StatsController {
 
         return githubService.fetchRepository(username, repo)
                 .map(repository -> {
-                    String svg = svgService.generateRepoCard(repository, colors, hide_border);
-                    return createSvgResponse(svg, 1800); // 30 min cache
+                    String svg = svgService.generateRepoCard(repository, colors, hide_border, show_description);
+                    return createSvgResponse(svg, 1800);
                 })
                 .onErrorResume(e -> {
                     e.printStackTrace();

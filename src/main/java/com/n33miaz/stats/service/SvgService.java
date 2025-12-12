@@ -30,15 +30,17 @@ public class SvgService {
                 .formatted(escapeHtml(text));
     }
 
-    // --- CARD DE REPOSITÓRIO (PIN) - VERSÃO CORRIGIDA FINAL ---
-    public String generateRepoCard(GithubResponse.Repository repo, Map<String, String> colors, boolean hideBorder) {
+    // --- CARD DE REPOSITÓRIO (PIN) ---
+    public String generateRepoCard(GithubResponse.Repository repo, Map<String, String> colors, boolean hideBorder,
+            boolean showDescription) {
+        // cores
         String titleColor = colors.getOrDefault("title_color", "2f80ed");
         String iconColor = colors.getOrDefault("icon_color", "586069");
         String textColor = colors.getOrDefault("text_color", "434d58");
         String bgColor = colors.getOrDefault("bg_color", "fffefe");
         String borderColor = colors.getOrDefault("border_color", "e4e2e2");
 
-        String description = repo.description() != null ? repo.description() : "No description provided";
+        // dados
         String langName = repo.primaryLanguage() != null ? repo.primaryLanguage().name() : "N/A";
         String langColor = repo.primaryLanguage() != null ? repo.primaryLanguage().color() : "#ccc";
         String stars = kFormatter(repo.stargazerCount());
@@ -49,41 +51,61 @@ public class SvgService {
                 : 0;
         String commits = kFormatter(commitCount);
 
-        List<String> descLines = wrapText(description, REPO_MAX_CHARS_PER_LINE, REPO_MAX_DESC_LINES);
+        // descrição
+        String rawDescription = repo.description();
+        boolean hasDescriptionText = rawDescription != null && !rawDescription.isEmpty();
+        boolean shouldRenderDesc = showDescription && hasDescriptionText;
 
+        List<String> descLines = new ArrayList<>();
+        if (shouldRenderDesc) {
+            descLines = wrapText(rawDescription, REPO_MAX_CHARS_PER_LINE, REPO_MAX_DESC_LINES);
+        }
+
+        int headerFontSize = shouldRenderDesc ? 18 : 22;
         int paddingTop = 40;
         int headerHeight = 25;
         int descLineHeight = 22;
-        int descBlockHeight = Math.max(descLines.size() * descLineHeight, 20); 
+
+        int descBlockHeight = shouldRenderDesc ? Math.max(descLines.size() * descLineHeight, 20) : 0;
+
         int footerHeight = 40;
         int paddingBottom = 15;
 
-        int totalHeight = paddingTop + headerHeight + descBlockHeight + footerHeight + paddingBottom;
+        int extraSpacing = shouldRenderDesc ? 0 : 25;
 
-        int headerY = 35; 
+        int totalHeight = paddingTop + headerHeight + descBlockHeight + footerHeight + paddingBottom + extraSpacing;
+
+        int headerY = shouldRenderDesc ? 35 : (totalHeight - footerHeight) / 2 - 5;
+
         int descStartY = headerY + 30;
-        int footerY = totalHeight - 20; 
+        int footerY = totalHeight - 20;
 
         int titleWidth = estimateTextWidth(repo.name());
+        if (!shouldRenderDesc)
+            titleWidth = (int) (titleWidth * 1.2);
+
         int iconSize = 20;
         int gapIconText = 10;
         int totalHeaderWidth = iconSize + gapIconText + titleWidth;
         int headerIconX = (REPO_CARD_WIDTH - totalHeaderWidth) / 2;
         int headerTextX = headerIconX + iconSize + gapIconText;
 
+        // descrição
         StringBuilder descSvg = new StringBuilder();
-        for (int i = 0; i < descLines.size(); i++) {
-            int lineY = descStartY + (i * descLineHeight);
-            descSvg.append(String.format(
-                    "<text x=\"200\" y=\"%d\" text-anchor=\"middle\" class=\"desc\">%s</text>",
-                    lineY,
-                    escapeHtml(descLines.get(i))));
+        if (shouldRenderDesc) {
+            for (int i = 0; i < descLines.size(); i++) {
+                int lineY = descStartY + (i * descLineHeight);
+                descSvg.append(String.format(
+                        "<text x=\"200\" y=\"%d\" text-anchor=\"middle\" class=\"desc\">%s</text>",
+                        lineY,
+                        escapeHtml(descLines.get(i))));
+            }
         }
 
         return """
                 <svg width="%d" height="%d" viewBox="0 0 %d %d" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <style>
-                        .header { font: 700 18px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
+                        .header { font: 700 %dpx 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
                         .desc { font: 400 13px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
                         .stat { font: 600 12px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
                         .icon { fill: #%s; }
@@ -116,13 +138,10 @@ public class SvgService {
 
                     <!-- FOOTER -->
                     <g class="fade-in d-3">
-
                         <!-- ESQUERDA -->
-                        <!-- Linguagem -->
                         <circle cx="30" cy="%d" r="5" fill="%s" />
                         <text x="40" y="%d" class="stat">%s</text>
 
-                        <!-- Commits -->
                         <g transform="translate(%d, %d)">
                             <svg class="icon" y="-11" viewBox="0 0 16 16" width="14" height="14">
                                 <path fill-rule="evenodd" d="M10.5 7.75a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm1.43.75a4.002 4.002 0 01-7.86 0H.75a.75.75 0 110-1.5h3.32a4.001 4.001 0 017.86 0h3.32a.75.75 0 110 1.5h-3.32z"/>
@@ -132,13 +151,11 @@ public class SvgService {
 
                         <!-- DIREITA -->
                         <g transform="translate(365, %d)">
-                            <!-- Forks -->
                             <text x="10" text-anchor="end" class="stat">%s</text>
                             <svg class="icon" x="-15" y="-11" viewBox="0 0 16 16" width="14" height="14">
                                 <path fill-rule="evenodd" d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z"/>
                             </svg>
 
-                            <!-- Stars -->
                             <g transform="translate(-45, 0)">
                                 <text x="12" text-anchor="end" class="stat">%s</text>
                                 <svg class="icon" x="-14" y="-11" viewBox="0 0 16 16" width="14" height="14">
@@ -151,21 +168,15 @@ public class SvgService {
                 """
                 .formatted(
                         REPO_CARD_WIDTH, totalHeight, REPO_CARD_WIDTH, totalHeight,
-                        titleColor, textColor, textColor, iconColor,
+                        headerFontSize, titleColor, textColor, textColor, iconColor,
                         REPO_CARD_WIDTH - 1, bgColor, borderColor, hideBorder ? "0" : "1",
-                        headerIconX, headerY - 15,
-                        headerTextX, headerY,
+                        headerIconX, headerY - 15, 
+                        headerTextX, headerY, 
                         escapeHtml(repo.name()),
                         descSvg.toString(),
-                        footerY - 5,
-                        langColor,
-                        footerY,
-                        escapeHtml(langName),
-                        40 + estimateTextWidth(langName) + 15, footerY,
-                        commits,
-                        footerY,
-                        forks,
-                        stars);
+                        footerY - 5, langColor, footerY, escapeHtml(langName),
+                        40 + estimateTextWidth(langName) + 15, footerY, commits,
+                        footerY, forks, stars);
     }
 
     // --- DASHBOARD DE MÚSICA ---
