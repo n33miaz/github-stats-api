@@ -31,7 +31,8 @@ public class SvgService {
     }
 
     // --- CARD DE REPOSITÓRIO (PIN) ---
-    public String generateRepoCard(GithubResponse.Repository repo, Map<String, String> colors, boolean hideBorder,
+    public String generateRepoCard(GithubResponse.Repository repo, Map<String, String> colors,
+            boolean hideBorder,
             boolean showDescription) {
         // cores
         String titleColor = colors.getOrDefault("title_color", "2f80ed");
@@ -84,12 +85,6 @@ public class SvgService {
         if (!shouldRenderDesc)
             titleWidth = (int) (titleWidth * 1.2);
 
-        int iconSize = 20;
-        int gapIconText = 10;
-        int totalHeaderWidth = iconSize + gapIconText + titleWidth;
-        int headerIconX = (REPO_CARD_WIDTH - totalHeaderWidth) / 2;
-        int headerTextX = headerIconX + iconSize + gapIconText;
-
         // descrição
         StringBuilder descSvg = new StringBuilder();
         if (shouldRenderDesc) {
@@ -125,10 +120,7 @@ public class SvgService {
 
                     <!-- HEADER -->
                     <g class="fade-in d-1">
-                        <svg class="icon" x="%d" y="%d" viewBox="0 0 16 16" width="20" height="20" margin="1">
-                            <path fill-rule="evenodd" d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z"/>
-                        </svg>
-                        <text x="%d" y="%d" class="header">%s</text>
+                        <text x="200" y="%d" text-anchor="middle" class="header">%s</text>
                     </g>
 
                     <!-- DESCRIÇÃO -->
@@ -170,8 +162,7 @@ public class SvgService {
                         REPO_CARD_WIDTH, totalHeight, REPO_CARD_WIDTH, totalHeight,
                         headerFontSize, titleColor, textColor, textColor, iconColor,
                         REPO_CARD_WIDTH - 1, bgColor, borderColor, hideBorder ? "0" : "1",
-                        headerIconX, headerY - 15,
-                        headerTextX, headerY,
+                        headerY,
                         escapeHtml(repo.name()),
                         descSvg.toString(),
                         footerY - 5, langColor, footerY, escapeHtml(langName),
@@ -187,14 +178,14 @@ public class SvgService {
             boolean hideBorder,
             String username) {
 
-        // 1. Configuração de Cores
+        // cores
         String titleColor = colors.getOrDefault("title_color", "762075");
         String textColor = colors.getOrDefault("text_color", "c9d1d9");
         String bgColor = colors.getOrDefault("bg_color", "0d1117");
         String borderColor = colors.getOrDefault("border_color", "e4e2e2");
         String wakaColor = "39d353";
 
-        // 2. Dados e Escalas
+        // dados
         List<DailyStat> stats = mergeData(githubData, wakaData, 7);
 
         int maxCommits = stats.stream().mapToInt(DailyStat::commits).max().orElse(5);
@@ -202,7 +193,7 @@ public class SvgService {
         double maxSeconds = stats.stream().mapToDouble(DailyStat::seconds).max().orElse(3600.0);
         maxSeconds = Math.max(maxSeconds, 3600.0);
 
-        // 3. Layout
+        // layout
         int width = 800;
         int height = 300;
         int padTop = 60;
@@ -214,7 +205,7 @@ public class SvgService {
         int graphWidth = width - padLeft - padRight;
         double stepX = (double) graphWidth / (stats.size() - 1);
 
-        // 4. Construção do Grid (Horizontal e Vertical) e Labels Y
+        // grid
         StringBuilder gridSvg = new StringBuilder();
         StringBuilder labelsSvg = new StringBuilder();
 
@@ -223,12 +214,12 @@ public class SvgService {
             double ratio = (double) i / steps;
             int y = padTop + graphHeight - (int) (graphHeight * ratio);
 
-            // Grid Horizontal
+            // grid horizontal
             gridSvg.append(String.format(java.util.Locale.US,
                     "<line x1='%d' y1='%d' x2='%d' y2='%d' class='grid' />",
                     padLeft, y, width - padRight, y));
 
-            // Labels
+            // labels
             int valCommit = (int) (maxCommits * ratio);
             String valTime = formatDurationShort((long) (maxSeconds * ratio));
 
@@ -241,7 +232,7 @@ public class SvgService {
                     width - padRight + 10, y + 4, valTime));
         }
 
-        // 5. Coleta de Pontos e Tooltips
+        // pontos e tooltips
         List<Point> commitPoints = new ArrayList<>();
         List<Point> wakaPoints = new ArrayList<>();
         StringBuilder xAxisSvg = new StringBuilder();
@@ -257,26 +248,25 @@ public class SvgService {
             commitPoints.add(new Point(x, yCommits));
             wakaPoints.add(new Point(x, yWaka));
 
-            // Grid Vertical
+            // grid vertical
             if (i > 0 && i < stats.size() - 1) {
                 gridSvg.append(String.format(java.util.Locale.US,
                         "<line x1='%.2f' y1='%d' x2='%.2f' y2='%d' class='grid' />",
                         x, padTop, x, height - padBottom));
             }
 
-            // Eixo X (Datas)
+            // Datas
             String textAnchor = (i == 0) ? "start" : (i == stats.size() - 1) ? "end" : "middle";
             xAxisSvg.append(String.format(java.util.Locale.US,
                     "<text x='%.2f' y='%d' text-anchor='%s' class='axis-text'>%s</text>",
                     x, height - 15, textAnchor, formatDateDDMM(stat.date)));
 
-            // Lógica de Colisão/Sobreposição
+            // colisão/sobreposição
             double dist = Math.abs(yCommits - yWaka);
             boolean overlap = dist < 12;
             boolean hasWaka = stat.seconds > 0;
             String dateFormatted = formatDateDDMM(stat.date);
 
-            // --- MUDANÇA AQUI: Usar o formato completo para o Tooltip ---
             String timeTooltip = formatDurationFull((long) stat.seconds);
 
             String tooltipAnchor = "middle";
@@ -286,21 +276,21 @@ public class SvgService {
                 tooltipAnchor = "end";
 
             if (overlap && hasWaka) {
-                // Ponto Fundido
+                // pontos fundidos
                 pointsAndTooltipsSvg.append(generateInteractivePoint(
                         x, yCommits,
                         "ffffff", bgColor,
                         titleColor, wakaColor,
-                        stat.commits, timeTooltip, dateFormatted, // Passando timeTooltip completo
+                        stat.commits, timeTooltip, dateFormatted,
                         tooltipAnchor, true, i));
             } else {
-                // Pontos Separados
+                // pontos separados
                 if (hasWaka) {
                     pointsAndTooltipsSvg.append(generateInteractivePoint(
                             x, yWaka,
                             wakaColor, bgColor,
                             null, wakaColor,
-                            -1, timeTooltip, dateFormatted, // Passando timeTooltip completo
+                            -1, timeTooltip, dateFormatted,
                             tooltipAnchor, false, i));
                 }
                 pointsAndTooltipsSvg.append(generateInteractivePoint(
@@ -312,13 +302,12 @@ public class SvgService {
             }
         }
 
-        // 6. Geração dos Paths Suaves
+        // paths suaves
         String commitsLinePath = buildSmoothPath(commitPoints, false, 0, 0, 0);
         String commitsAreaPath = buildSmoothPath(commitPoints, true, height - padBottom, padLeft, width - padRight);
         String wakaLinePath = buildSmoothPath(wakaPoints, false, 0, 0, 0);
 
-        // 7. Montagem Final (Usando String.format Locale.US para evitar erro de locale)
-        // OBS: Certifique-se de que os %s no bloco de STYLE batem com os argumentos
+        // montagem
         return String.format(java.util.Locale.US,
                 """
                         <svg width="%d" height="%d" viewBox="0 0 %d %d" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -338,7 +327,7 @@ public class SvgService {
                                 @keyframes fadeIn { to { opacity: 1; } }
                                 @keyframes blink { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
 
-                                /* TOOLTIP STYLES */
+                                /* TOOLTIP */
                                 .point-group { cursor: pointer; }
                                 .tooltip-container { opacity: 0; transition: opacity 0.2s ease-in-out; pointer-events: none; }
                                 .point-group:hover .tooltip-container { opacity: 1; }
@@ -385,20 +374,19 @@ public class SvgService {
                             %s
                         </svg>
                         """,
-                width, height, width, height, // 1-4: ViewBox
-                titleColor, textColor, titleColor, // 5-7: Styles (%s, %s, %s)
-                width - 1, bgColor, borderColor, hideBorder ? "0" : "1", // 8-11: Rect BG
-                padLeft, // 12: Header X
-                width - padRight - 170, // 13: Legend X
-                titleColor, textColor, // 14-15: Legend 1
-                wakaColor, textColor, // 16-17: Legend 2
-                gridSvg.toString(), labelsSvg.toString(), xAxisSvg.toString(), // 18-20: SVG Parts
-                titleColor, titleColor, // 21-22: Gradient
-                commitsAreaPath, // 23
-                wakaLinePath, wakaColor, // 24-25
-                commitsLinePath, titleColor, // 26-27
-                pointsAndTooltipsSvg.toString() // 28
-        );
+                width, height, width, height,
+                titleColor, textColor, titleColor,
+                width - 1, bgColor, borderColor, hideBorder ? "0" : "1",
+                padLeft,
+                width - padRight - 170,
+                titleColor, textColor,
+                wakaColor, textColor,
+                gridSvg.toString(), labelsSvg.toString(), xAxisSvg.toString(),
+                titleColor, titleColor,
+                commitsAreaPath,
+                wakaLinePath, wakaColor,
+                commitsLinePath, titleColor,
+                pointsAndTooltipsSvg.toString());
     }
 
     // --- DASHBOARD DE MÚSICA ---
@@ -537,19 +525,17 @@ public class SvgService {
             com.n33miaz.stats.dto.WakaTimeSummaryResponse wk,
             int days) {
 
-        // TreeMap garante a ordenação pelas chaves (datas)
         java.util.TreeMap<String, DailyStat> map = new java.util.TreeMap<>();
         java.time.format.DateTimeFormatter iso = java.time.format.DateTimeFormatter.ISO_DATE;
         java.time.LocalDate end = java.time.LocalDate.now();
-        // Pegamos days-1 para incluir hoje e totalizar exatamente 'days' colunas
+
         java.time.LocalDate start = end.minusDays(days - 1);
 
-        // Inicializa o mapa com 0 para todos os dias do intervalo
         start.datesUntil(end.plusDays(1)).forEach(d -> {
             map.put(d.format(iso), new DailyStat(d.format(iso), 0, 0.0));
         });
 
-        // Preenche com dados do GitHub
+        // dados do GitHub
         if (gh != null && gh.data() != null && gh.data().user() != null) {
             gh.data().user().contributionsCollection().contributionCalendar().weeks().forEach(week -> {
                 week.contributionDays().forEach(day -> {
@@ -561,7 +547,7 @@ public class SvgService {
             });
         }
 
-        // Preenche com dados do WakaTime
+        // dados do WakaTime
         if (wk != null && wk.data() != null) {
             wk.data().forEach(summary -> {
                 String date = summary.range().date();
@@ -591,13 +577,11 @@ public class SvgService {
         long hours = totalSeconds / 3600;
         long minutes = (totalSeconds % 3600) / 60;
         if (hours > 0) {
-            // Ex: "4h 30m"
             return String.format("%dh %02dm", hours, minutes);
         }
         return minutes + "m";
     }
 
-    // Record auxiliar interno
     private record DailyStat(String date, int commits, double seconds) {
     }
 
@@ -626,7 +610,6 @@ public class SvgService {
             Point p2 = points.get(i + 1);
             Point p3 = (i < points.size() - 2) ? points.get(i + 2) : p2;
 
-            // Tensão de 0.2 gera curvas suaves sem "overshoot" excessivo
             double tension = 0.2;
 
             double cp1x = p1.x + (p2.x - p0.x) * tension;
@@ -656,45 +639,42 @@ public class SvgService {
 
         StringBuilder tooltipContent = new StringBuilder();
 
-        // Posição Y inicial do texto dentro do box (Padding Top)
         int currentY = 18;
 
-        // 1. Cabeçalho (Data)
+        // cabeçalho (Data)
         tooltipContent.append(String.format(
                 "<text x='0' y='%d' text-anchor='middle' class='tooltip-header' font-weight='bold'>%s</text>",
                 currentY, date));
 
-        currentY += 20; // Espaço entre Data e a próxima linha
+        currentY += 20;
 
-        // 2. Linha de Commits
+        // linha de commits
         if (commits >= 0) {
             tooltipContent.append(String.format(
                     "<text x='0' y='%d' text-anchor='middle' class='tooltip-text' fill='#%s'>Commits: %d</text>",
                     currentY, commitTextColor != null ? commitTextColor : "c9d1d9", commits));
-            currentY += 16; // Altura da linha de texto
+            currentY += 16;
         }
 
-        // 3. Linha de Tempo
+        // linha de tempo
         if (time != null) {
             tooltipContent.append(String.format(
                     "<text x='0' y='%d' text-anchor='middle' class='tooltip-text' fill='#%s'>Time: %s</text>",
                     currentY, wakaTextColor != null ? wakaTextColor : "c9d1d9", time));
-            currentY += 16; // Altura da linha de texto
+            currentY += 16;
         }
 
-        // --- CÁLCULOS FINAIS ---
-        int boxWidth = 125; // Largura confortável para horas e minutos
-        int boxHeight = currentY - 6; // Altura total = onde o cursor parou - pequeno ajuste fino
-        int boxY = -(boxHeight + 12); // Posiciona o modal ACIMA do ponto
+        // --- CÁLCULOS ---
+        int boxWidth = 125;
+        int boxHeight = currentY - 6;
+        int boxY = -(boxHeight + 12);
 
-        // Ajuste Lateral (para não cortar nas bordas do gráfico)
         int xOffset = 0;
         if ("start".equals(anchor))
             xOffset = 45;
         if ("end".equals(anchor))
             xOffset = -45;
 
-        // Se o ponto estiver muito no topo do gráfico, inverte o modal para baixo
         if (y < boxHeight + 20) {
             boxY = 20;
         }
