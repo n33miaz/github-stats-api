@@ -75,6 +75,40 @@ public class StatsController {
                 });
     }
 
+    @GetMapping("/stats")
+    public Mono<ResponseEntity<String>> getGithubStats(
+            @RequestParam String username,
+            @RequestParam(required = false) String title_color,
+            @RequestParam(required = false) String icon_color,
+            @RequestParam(required = false) String text_color,
+            @RequestParam(required = false) String bg_color,
+            @RequestParam(required = false) String border_color,
+            @RequestParam(defaultValue = "false") boolean hide_border) {
+
+        Map<String, String> colors = new HashMap<>();
+        if (title_color != null)
+            colors.put("title_color", title_color);
+        if (icon_color != null)
+            colors.put("icon_color", icon_color);
+        if (text_color != null)
+            colors.put("text_color", text_color);
+        if (bg_color != null)
+            colors.put("bg_color", bg_color);
+        if (border_color != null)
+            colors.put("border_color", border_color);
+
+        return githubService.fetchUserStats(username)
+                .map(stats -> {
+                    String svg = svgService.generateStatsCard(stats, colors, hide_border);
+                    return createSvgResponse(svg, 3600); // 1 hora de cache
+                })
+                .onErrorResume(e -> {
+                    e.printStackTrace();
+                    String errorSvg = svgService.generateTestSvg("Stats Error: " + e.getMessage());
+                    return Mono.just(new ResponseEntity<>(errorSvg, HttpStatus.BAD_REQUEST));
+                });
+    }
+
     @GetMapping("/graph")
     public Mono<ResponseEntity<String>> getContributionGraph(
             @RequestParam String username,
