@@ -170,13 +170,202 @@ public class SvgService {
                         REPO_CARD_WIDTH, totalHeight, REPO_CARD_WIDTH, totalHeight,
                         headerFontSize, titleColor, textColor, textColor, iconColor,
                         REPO_CARD_WIDTH - 1, bgColor, borderColor, hideBorder ? "0" : "1",
-                        headerIconX, headerY - 15, 
-                        headerTextX, headerY, 
+                        headerIconX, headerY - 15,
+                        headerTextX, headerY,
                         escapeHtml(repo.name()),
                         descSvg.toString(),
                         footerY - 5, langColor, footerY, escapeHtml(langName),
                         40 + estimateTextWidth(langName) + 15, footerY, commits,
                         footerY, forks, stars);
+    }
+
+    // --- GRÁFICO DE CONTRIBUIÇÃO (GitHub + WakaTime) ---
+    public String generateContributionGraph(
+            com.n33miaz.stats.dto.GithubContributionResponse githubData,
+            com.n33miaz.stats.dto.WakaTimeSummaryResponse wakaData,
+            Map<String, String> colors,
+            boolean hideBorder,
+            String username) {
+        
+        // 1. Configuração de Cores
+        String titleColor = colors.getOrDefault("title_color", "762075");
+        String textColor = colors.getOrDefault("text_color", "c9d1d9");
+        String bgColor = colors.getOrDefault("bg_color", "0d1117");
+        String borderColor = colors.getOrDefault("border_color", "e4e2e2");
+        String wakaColor = "39d353"; 
+
+        // 2. Dados e Escalas
+        List<DailyStat> stats = mergeData(githubData, wakaData, 7);
+
+        int maxCommits = stats.stream().mapToInt(DailyStat::commits).max().orElse(5);
+        maxCommits = Math.max(maxCommits, 5); 
+
+        double maxSeconds = stats.stream().mapToDouble(DailyStat::seconds).max().orElse(3600.0);
+        maxSeconds = Math.max(maxSeconds, 3600.0);
+
+        // 3. Layout Ajustado
+        int width = 800;
+        int height = 300;
+        int padTop = 60;      
+        int padBottom = 50;   // Aumentado para as datas respirarem
+        int padLeft = 60;     
+        int padRight = 60;    
+
+        int graphHeight = height - padTop - padBottom;
+        int graphWidth = width - padLeft - padRight;
+        double stepX = (double) graphWidth / (stats.size() - 1);
+
+        // 4. Construção do Grid e Labels Y (Com Locale.US)
+        StringBuilder gridAndLabelsSvg = new StringBuilder();
+        int steps = 4;
+        for (int i = 0; i <= steps; i++) {
+            double ratio = (double) i / steps; // 0.0 a 1.0
+            int y = padTop + graphHeight - (int) (graphHeight * ratio);
+            
+            int valCommit = (int) (maxCommits * ratio);
+            String valTime = formatDurationShort((long) (maxSeconds * ratio));
+
+            // Linha horizontal
+            gridAndLabelsSvg.append(String.format(java.util.Locale.US, 
+                "<line x1='%d' y1='%d' x2='%d' y2='%d' class='grid' />", 
+                padLeft, y, width - padRight, y));
+
+            // Labels Laterais (Evita sobrepor o 0 com a data movendo levemente)
+            gridAndLabelsSvg.append(String.format(java.util.Locale.US, 
+                "<text x='%d' y='%d' text-anchor='end' class='axis-text'>%d</text>", 
+                padLeft - 10, y + 4, valCommit));
+
+            gridAndLabelsSvg.append(String.format(java.util.Locale.US, 
+                "<text x='%d' y='%d' text-anchor='start' class='axis-text'>%s</text>", 
+                width - padRight + 10, y + 4, valTime));
+        }
+
+        // 5. Pontos, Linhas e Eixo X (Datas)
+        StringBuilder commitsPath = new StringBuilder();
+        StringBuilder wakaPath = new StringBuilder();
+        StringBuilder pointsSvg = new StringBuilder();
+        StringBuilder xAxisSvg = new StringBuilder();
+
+        for (int i = 0; i < stats.size(); i++) {
+            DailyStat stat = stats.get(i);
+            
+            double x = padLeft + (i * stepX);
+            double yCommits = padTop + graphHeight - ((double) stat.commits / maxCommits * graphHeight);
+            double yWaka = padTop + graphHeight - (stat.seconds / maxSeconds * graphHeight);
+
+            // Path Commands
+            String cmd = (i == 0) ? "M" : "L";
+            commitsPath.append(String.format(java.util.Locale.US, "%s %.2f %.2f ", cmd, x, yCommits));
+            wakaPath.append(String.format(java.util.Locale.US, "%s %.2f %.2f ", cmd, x, yWaka));
+
+            // Eixo X (Datas) - Lógica de ancoragem para não cortar
+            String textAnchor = "middle";
+            double textX = x;
+            
+            if (i == 0) { 
+                textAnchor = "start"; 
+            } else if (i == stats.size() - 1) { 
+                textAnchor = "end"; 
+            }
+
+            // A data fica abaixo do gráfico (y = height - 15)
+            xAxisSvg.append(String.format(java.util.Locale.US,
+                "<text x='%.2f' y='%d' text-anchor='%s' class='axis-text'>%s</text>", 
+                textX, height - 15, textAnchor, formatDateDDMM(stat.date)
+            ));
+
+            // Pontos (Circles) - Locale.US corrige o vazamento no topo esquerdo
+            pointsSvg.append(String.format(java.util.Locale.US,
+                "<circle cx='%.2f' cy='%.2f' r='4' fill='#%s' stroke='#%s' stroke-width='2' class='point' style='animation-delay: %.2fs'/>",
+                x, yCommits, titleColor, bgColor, 1.0 + (i * 0.1)
+            ));
+            
+            if (stat.seconds > 0) {
+                pointsSvg.append(String.format(java.util.Locale.US,
+                    "<circle cx='%.2f' cy='%.2f' r='4' fill='#%s' stroke='#%s' stroke-width='2' class='point' style='animation-delay: %.2fs'/>",
+                    x, yWaka, wakaColor, bgColor, 1.2 + (i * 0.1)
+                ));
+            }
+        }
+
+        String areaPath = commitsPath.toString() + String.format(java.util.Locale.US, " L %.2f %d L %d %d Z", 
+            (double)(width - padRight), height - padBottom, padLeft, height - padBottom);
+
+        return """
+                <svg width="%d" height="%d" viewBox="0 0 %d %d" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <style>
+                        .title { font: 700 20px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
+                        .axis-text { font: 400 11px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; opacity: 0.7; }
+                        .legend { font: 600 12px 'Segoe UI', Ubuntu, Sans-Serif; }
+                        .grid { stroke: #%s; stroke-width: 1; stroke-dasharray: 4; opacity: 0.1; }
+                        
+                        .line-path { stroke-dasharray: 2000; stroke-dashoffset: 2000; animation: drawLine 2s ease-out forwards; }
+                        .area-path { opacity: 0; animation: fadeIn 1.5s ease-out forwards 0.5s; }
+                        
+                        /* Fix para as bolinhas vazando: transform-box */
+                        .point { 
+                            opacity: 0; 
+                            transform-box: fill-box;
+                            transform-origin: center;
+                            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; 
+                        }
+
+                        @keyframes drawLine { to { stroke-dashoffset: 0; } }
+                        @keyframes fadeIn { to { opacity: 1; } }
+                        @keyframes popIn { from { opacity: 0; transform: scale(0); } to { opacity: 1; transform: scale(1); } }
+                    </style>
+
+                    <rect x="0.5" y="0.5" rx="10" height="99%%" width="%d" fill="#%s" stroke="#%s" stroke-opacity="%s" />
+
+                    <!-- Header -->
+                    <g transform="translate(%d, 40)">
+                        <text x="0" y="0" class="title">Weekly Activity</text>
+                    </g>
+                    
+                    <!-- Legenda (Superior Direito) -->
+                    <g transform="translate(%d, 40)">
+                        <rect x="0" y="-8" width="10" height="10" rx="2" fill="#%s" />
+                        <text x="15" y="1" class="legend" fill="#%s">Commits</text>
+                        
+                        <rect x="80" y="-8" width="10" height="10" rx="2" fill="#%s" />
+                        <text x="95" y="1" class="legend" fill="#%s">Coding Time</text>
+                    </g>
+
+                    <!-- Grid e Eixos -->
+                    %s
+                    %s
+
+                    <!-- Gráficos -->
+                    <defs>
+                        <linearGradient id="gradCommits" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%%" stop-color="#%s" stop-opacity="0.2"/>
+                            <stop offset="100%%" stop-color="#%s" stop-opacity="0"/>
+                        </linearGradient>
+                    </defs>
+
+                    <path d="%s" fill="url(#gradCommits)" class="area-path" />
+                    <path d="%s" fill="none" stroke="#%s" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="line-path" style="animation-delay: 0.5s"/>
+                    <path d="%s" fill="none" stroke="#%s" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="line-path"/>
+
+                    <!-- Pontos -->
+                    %s
+                </svg>
+                """.formatted(
+                    width, height, width, height, // ViewBox
+                    titleColor, textColor, textColor, // CSS Colors
+                    width - 1, bgColor, borderColor, hideBorder ? "0" : "1", // Card BG
+                    padLeft, // Title X
+                    width - padRight - 170, // Legend X
+                    titleColor, textColor, // Legend Commits
+                    wakaColor, textColor, // Legend Waka
+                    gridAndLabelsSvg.toString(), // Y Axis
+                    xAxisSvg.toString(), // X Axis (Dates)
+                    titleColor, titleColor, // Gradient
+                    areaPath, // Area Path
+                    wakaPath.toString(), wakaColor, // Waka Line
+                    commitsPath.toString(), titleColor, // Commit Line
+                    pointsSvg.toString() // Points
+                );
     }
 
     // --- DASHBOARD DE MÚSICA ---
@@ -310,6 +499,72 @@ public class SvgService {
     }
 
     // --- HELPERS ---
+    private List<DailyStat> mergeData(
+            com.n33miaz.stats.dto.GithubContributionResponse gh,
+            com.n33miaz.stats.dto.WakaTimeSummaryResponse wk,
+            int days) {
+
+        // TreeMap garante a ordenação pelas chaves (datas)
+        java.util.TreeMap<String, DailyStat> map = new java.util.TreeMap<>();
+        java.time.format.DateTimeFormatter iso = java.time.format.DateTimeFormatter.ISO_DATE;
+        java.time.LocalDate end = java.time.LocalDate.now();
+        // Pegamos days-1 para incluir hoje e totalizar exatamente 'days' colunas
+        java.time.LocalDate start = end.minusDays(days - 1);
+
+        // Inicializa o mapa com 0 para todos os dias do intervalo
+        start.datesUntil(end.plusDays(1)).forEach(d -> {
+            map.put(d.format(iso), new DailyStat(d.format(iso), 0, 0.0));
+        });
+
+        // Preenche com dados do GitHub
+        if (gh != null && gh.data() != null && gh.data().user() != null) {
+            gh.data().user().contributionsCollection().contributionCalendar().weeks().forEach(week -> {
+                week.contributionDays().forEach(day -> {
+                    if (map.containsKey(day.date())) {
+                        DailyStat current = map.get(day.date());
+                        map.put(day.date(), new DailyStat(day.date(), day.contributionCount(), current.seconds));
+                    }
+                });
+            });
+        }
+
+        // Preenche com dados do WakaTime
+        if (wk != null && wk.data() != null) {
+            wk.data().forEach(summary -> {
+                String date = summary.range().date();
+                if (map.containsKey(date)) {
+                    DailyStat current = map.get(date);
+                    map.put(date, new DailyStat(date, current.commits, summary.grandTotal().totalSeconds()));
+                }
+            });
+        }
+
+        return new ArrayList<>(map.values());
+    }
+
+    private String formatDurationShort(long totalSeconds) {
+        if (totalSeconds == 0)
+            return "0m";
+        long hours = totalSeconds / 3600;
+        if (hours > 0)
+            return hours + "h";
+        long minutes = (totalSeconds % 3600) / 60;
+        return minutes + "m";
+    }
+
+    // Record auxiliar interno
+    private record DailyStat(String date, int commits, double seconds) {
+    }
+
+    private String formatDateDDMM(String isoDate) {
+        try {
+            java.time.LocalDate date = java.time.LocalDate.parse(isoDate);
+            return String.format("%02d/%02d", date.getDayOfMonth(), date.getMonthValue());
+        } catch (Exception e) {
+            return isoDate;
+        }
+    }
+
     private String renderList(List<SimpleItem> items, int x, int yStart, boolean isCircle, String titleColor,
             String subColor, boolean showExtra) {
         StringBuilder sb = new StringBuilder();

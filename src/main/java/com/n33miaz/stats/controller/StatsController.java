@@ -2,6 +2,8 @@ package com.n33miaz.stats.controller;
 
 import com.n33miaz.stats.service.GithubService;
 import com.n33miaz.stats.service.SvgService;
+import com.n33miaz.stats.service.WakaTimeService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -24,6 +27,9 @@ public class StatsController {
 
     @Autowired
     private GithubService githubService;
+
+    @Autowired
+    private WakaTimeService wakaTimeService;
 
     @Autowired
     private com.n33miaz.stats.service.LastFmService lastFmService;
@@ -44,8 +50,7 @@ public class StatsController {
             @RequestParam(required = false) String bg_color,
             @RequestParam(required = false) String border_color,
             @RequestParam(defaultValue = "false") boolean hide_border,
-            @RequestParam(defaultValue = "true") boolean show_description
-    ) {
+            @RequestParam(defaultValue = "true") boolean show_description) {
         Map<String, String> colors = new HashMap<>();
         if (title_color != null)
             colors.put("title_color", title_color);
@@ -67,6 +72,48 @@ public class StatsController {
                     e.printStackTrace();
                     String errorSvg = svgService.generateTestSvg("Error: " + e.getMessage());
                     return Mono.just(new ResponseEntity<>(errorSvg, HttpStatus.BAD_REQUEST));
+                });
+    }
+
+    @GetMapping("/graph")
+    public Mono<ResponseEntity<String>> getContributionGraph(
+            @RequestParam String username,
+            @RequestParam(required = false) String waka_user,
+            @RequestParam(required = false) String title_color,
+            @RequestParam(required = false) String icon_color,
+            @RequestParam(required = false) String text_color,
+            @RequestParam(required = false) String bg_color,
+            @RequestParam(required = false) String border_color,
+            @RequestParam(defaultValue = "false") boolean hide_border) {
+        Map<String, String> colors = new HashMap<>();
+        if (title_color != null)
+            colors.put("title_color", title_color);
+        if (icon_color != null)
+            colors.put("icon_color", icon_color);
+        if (text_color != null)
+            colors.put("text_color", text_color);
+        if (bg_color != null)
+            colors.put("bg_color", bg_color);
+        if (border_color != null)
+            colors.put("border_color", border_color);
+
+        String finalWakaUser = waka_user != null ? waka_user : username;
+
+        return Mono.zip(
+                githubService.fetchContributions(username),
+                wakaTimeService.getDailySummaries(finalWakaUser, 7)
+                        .defaultIfEmpty(new com.n33miaz.stats.dto.WakaTimeSummaryResponse(Collections.emptyList())))
+                .map(tuple -> {
+                    var githubData = tuple.getT1();
+                    var wakaData = tuple.getT2();
+
+                    String svg = svgService.generateContributionGraph(githubData, wakaData, colors, hide_border,
+                            username);
+
+                    HttpHeaders headers = new HttpHeaders();
+                    headers.add("Content-Type", "image/svg+xml");
+                    headers.add("Cache-Control", "public, max-age=3600"); // 1 hora
+                    return new ResponseEntity<>(svg, headers, HttpStatus.OK);
                 });
     }
 

@@ -1,5 +1,6 @@
 package com.n33miaz.stats.service;
 
+import com.n33miaz.stats.dto.GithubContributionResponse;
 import com.n33miaz.stats.dto.GithubResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -50,5 +51,33 @@ public class GithubService {
           }
           return response.data().repository();
         });
+  }
+
+  public Mono<GithubContributionResponse> fetchContributions(String username) {
+    String query = """
+        query($username: String!) {
+          user(login: $username) {
+            contributionsCollection {
+              contributionCalendar {
+                weeks {
+                  contributionDays {
+                    date
+                    contributionCount
+                    color
+                  }
+                }
+              }
+            }
+          }
+        }
+        """;
+
+    Map<String, Object> variables = Map.of("username", username);
+    Map<String, Object> body = Map.of("query", query, "variables", variables);
+
+    return webClient.post()
+        .bodyValue(body)
+        .retrieve()
+        .bodyToMono(GithubContributionResponse.class);
   }
 }
