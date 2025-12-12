@@ -144,8 +144,9 @@ public class LastFmService {
                 .retrieve()
                 .bodyToMono(LastFmResponse.class)
                 .flatMapMany(response -> Flux.fromIterable(response.topalbums().album()))
-                .flatMap(album -> {
+                .flatMapSequential(album -> {
                     String imgUrl = getImageUrl(album.images());
+
                     return downloadImageAsBase64(imgUrl)
                             .map(base64 -> new SimpleItem(album.name(), album.artist().name(), base64,
                                     album.playcount() + " plays"));
