@@ -249,15 +249,12 @@ public class SvgService {
                     <!-- Fundo -->
                     <rect x="0.5" y="0.5" rx="10" height="99%%" width="%d" fill="#%s" stroke="#%s" stroke-opacity="%s" />
 
-                    <!-- Título -->
-                    <text x="%d" y="%d" class="header">GitHub Stats</text>
-
                     <!-- Stats -->
                     <g transform="translate(%d, %d)">
                         %s
                     </g>
 
-                    <!-- Círculo de Rank -->
+                    <!-- Rank -->
                     <g transform="translate(%d, %d)">
                         <g class="fade-in delay-5">
                             <circle cx="40" cy="40" r="40" fill="none" stroke="#%s" stroke-width="6" opacity="0.2" />
@@ -272,10 +269,9 @@ public class SvgService {
                         titleColor, textColor, textColor, iconColor, textColor,
                         strokeOffset,
                         width - 1, bgColor, borderColor, hideBorder ? "0" : "1",
-                        paddingX, paddingY,
-                        paddingX, paddingY + 35,
+                        paddingX, 55,
                         rowsSvg.toString(),
-                        width - 100 - paddingX, (height / 2) - 30,
+                        width - 100 - paddingX, (height / 2) - 40,
                         ringColor, ringColor,
                         stats.rank().level());
     }
@@ -385,7 +381,7 @@ public class SvgService {
                 col1X, sideNumsColor, kFormatter(stats.currentYearCommits()),
                 col1X, sideLabelsColor,
                 col1X, datesColor,
-                textColor, 
+                textColor,
                 col2X, ringColor,
                 col2X, ringColor, col2X,
                 col2X - 12, fireIcon, fireColor,
