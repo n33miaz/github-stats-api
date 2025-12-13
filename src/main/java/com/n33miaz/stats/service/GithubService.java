@@ -3,12 +3,19 @@ package com.n33miaz.stats.service;
 import com.n33miaz.stats.dto.GithubContributionResponse;
 import com.n33miaz.stats.dto.GithubResponse;
 import com.n33miaz.stats.dto.GithubStatsDto;
+import com.n33miaz.stats.dto.StreakStatsDto;
 import com.n33miaz.stats.dto.TotalCommitsDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -222,5 +229,107 @@ public class GithubService {
 
   private double logNormalCdf(double x) {
     return x / (1 + x);
+  }
+
+  public Mono<StreakStatsDto> fetchStreakStats(String username) {
+    return fetchContributions(username)
+        .map(this::calculateStreak);
+  }
+
+  private StreakStatsDto calculateStreak(GithubContributionResponse response) {
+    List<GithubContributionResponse.ContributionDay> allDays = new ArrayList<>();
+
+    if (response.data() != null && response.data().user() != null) {
+      response.data().user().contributionsCollection().contributionCalendar().weeks()
+          .forEach(week -> allDays.addAll(week.contributionDays()));
+    }
+
+    allDays.sort(Comparator.comparing(GithubContributionResponse.ContributionDay::date));
+
+    LocalDate today = LocalDate.now();
+    int currentYear = today.getYear();
+    DateTimeFormatter rangeFmt = DateTimeFormatter.ofPattern("MMM dd", Locale.US);
+
+    int totalCommitsYear = allDays.stream()
+        .filter(d -> LocalDate.parse(d.date()).getYear() == currentYear)
+        .mapToInt(GithubContributionResponse.ContributionDay::contributionCount)
+        .sum();
+
+    int currentStreak = 0;
+    int longestStreak = 0;
+    int tempStreak = 0;
+
+    LocalDate currentStreakStart = null;
+    LocalDate currentStreakEnd = null;
+
+    LocalDate longestStreakStart = null;
+    LocalDate longestStreakEnd = null;
+    LocalDate tempStart = null;
+
+    for (GithubContributionResponse.ContributionDay day : allDays) {
+      if (day.contributionCount() > 0) {
+        if (tempStreak == 0) {
+          tempStart = LocalDate.parse(day.date());
+        }
+        tempStreak++;
+
+        if (tempStreak > longestStreak) {
+          longestStreak = tempStreak;
+          longestStreakStart = tempStart;
+          longestStreakEnd = LocalDate.parse(day.date());
+        }
+      } else {
+        tempStreak = 0;
+        tempStart = null;
+      }
+    }
+
+    boolean streakActive = false;
+    int size = allDays.size();
+
+    if (size > 0) {
+      var lastDay = allDays.get(size - 1);
+      LocalDate lastDate = LocalDate.parse(lastDay.date());
+
+      if ((lastDate.isEqual(today) || lastDate.isEqual(today.minusDays(1))) && lastDay.contributionCount() > 0) {
+        streakActive = true;
+      }
+      else if (size > 1) {
+        var yesterday = allDays.get(size - 2);
+        if (LocalDate.parse(yesterday.date()).isEqual(today.minusDays(1)) && yesterday.contributionCount() > 0) {
+          streakActive = true;
+        }
+      }
+    }
+
+    if (streakActive) {
+      for (int i = size - 1; i >= 0; i--) {
+        var day = allDays.get(i);
+        if (day.contributionCount() > 0) {
+          currentStreak++;
+          currentStreakStart = LocalDate.parse(day.date());
+          if (currentStreakEnd == null)
+            currentStreakEnd = LocalDate.parse(day.date());
+        } else {
+          LocalDate d = LocalDate.parse(day.date());
+          if (!d.isEqual(today)) {
+            break;
+          }
+        }
+      }
+    }
+
+    String currentRange = formatRange(currentStreakStart, currentStreakEnd, rangeFmt);
+    String longestRange = formatRange(longestStreakStart, longestStreakEnd, rangeFmt);
+
+    return new StreakStatsDto(totalCommitsYear, currentStreak, currentRange, longestStreak, longestRange);
+  }
+
+  private String formatRange(LocalDate start, LocalDate end, DateTimeFormatter fmt) {
+    if (start == null || end == null)
+      return "No Activity";
+    if (start.isEqual(end))
+      return start.format(fmt);
+    return start.format(fmt) + " - " + end.format(fmt);
   }
 }

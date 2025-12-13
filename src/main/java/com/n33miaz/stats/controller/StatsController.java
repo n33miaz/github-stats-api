@@ -109,6 +109,74 @@ public class StatsController {
                 });
     }
 
+    @GetMapping("/streak")
+    public Mono<ResponseEntity<String>> getStreakStats(
+            @RequestParam String username,
+            @RequestParam(required = false) String title_color,
+            @RequestParam(required = false) String icon_color, // usado como fallback
+            @RequestParam(required = false) String text_color,
+            @RequestParam(required = false) String bg_color,
+            @RequestParam(required = false) String border_color,
+            @RequestParam(required = false) String ring,
+            @RequestParam(required = false) String fire,
+            @RequestParam(required = false) String currStreakNum,
+            @RequestParam(required = false) String sideNums,
+            @RequestParam(required = false) String sideLabels,
+            @RequestParam(required = false) String dates,
+            @RequestParam(defaultValue = "false") boolean hide_border) {
+
+        Map<String, String> colors = new HashMap<>();
+
+        // Cores base
+        if (title_color != null)
+            colors.put("title_color", title_color);
+        if (text_color != null)
+            colors.put("text_color", text_color);
+        if (bg_color != null)
+            colors.put("bg_color", bg_color);
+        if (border_color != null)
+            colors.put("border_color", border_color);
+
+        // Cores específicas do streak (se não passar, usa title_color/text_color no
+        // SVGService)
+        if (ring != null)
+            colors.put("ring", ring);
+        else if (title_color != null)
+            colors.put("ring", title_color);
+
+        if (fire != null)
+            colors.put("fire", fire);
+        else if (title_color != null)
+            colors.put("fire", title_color);
+
+        if (currStreakNum != null)
+            colors.put("currStreakNum", currStreakNum);
+        else if (text_color != null)
+            colors.put("currStreakNum", text_color);
+
+        if (sideNums != null)
+            colors.put("sideNums", sideNums);
+        else if (text_color != null)
+            colors.put("sideNums", text_color);
+
+        if (sideLabels != null)
+            colors.put("sideLabels", sideLabels);
+
+        if (dates != null)
+            colors.put("dates", dates);
+
+        return githubService.fetchStreakStats(username)
+                .map(stats -> {
+                    String svg = svgService.generateStreakCard(stats, colors, hide_border);
+                    return createSvgResponse(svg, 3600); // 1 hora cache
+                })
+                .onErrorResume(e -> {
+                    e.printStackTrace();
+                    String errorSvg = svgService.generateTestSvg("Streak Error: " + e.getMessage());
+                    return Mono.just(new ResponseEntity<>(errorSvg, HttpStatus.BAD_REQUEST));
+                });
+    }
+
     @GetMapping("/graph")
     public Mono<ResponseEntity<String>> getContributionGraph(
             @RequestParam String username,
