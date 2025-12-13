@@ -112,8 +112,9 @@ public class StatsController {
     @GetMapping("/streak")
     public Mono<ResponseEntity<String>> getStreakStats(
             @RequestParam String username,
+            @RequestParam(required = false) String waka_user, // Opcional: caso o user do WakaTime seja diferente
             @RequestParam(required = false) String title_color,
-            @RequestParam(required = false) String icon_color, // usado como fallback
+            @RequestParam(required = false) String icon_color,
             @RequestParam(required = false) String text_color,
             @RequestParam(required = false) String bg_color,
             @RequestParam(required = false) String border_color,
@@ -123,11 +124,11 @@ public class StatsController {
             @RequestParam(required = false) String sideNums,
             @RequestParam(required = false) String sideLabels,
             @RequestParam(required = false) String dates,
+            @RequestParam(required = false) String timeCoded, // Sobrescreve o automático se passado
             @RequestParam(defaultValue = "false") boolean hide_border) {
 
         Map<String, String> colors = new HashMap<>();
 
-        // Cores base
         if (title_color != null)
             colors.put("title_color", title_color);
         if (text_color != null)
@@ -137,8 +138,6 @@ public class StatsController {
         if (border_color != null)
             colors.put("border_color", border_color);
 
-        // Cores específicas do streak (se não passar, usa title_color/text_color no
-        // SVGService)
         if (ring != null)
             colors.put("ring", ring);
         else if (title_color != null)
@@ -161,14 +160,43 @@ public class StatsController {
 
         if (sideLabels != null)
             colors.put("sideLabels", sideLabels);
-
         if (dates != null)
             colors.put("dates", dates);
 
-        return githubService.fetchStreakStats(username)
-                .map(stats -> {
-                    String svg = svgService.generateStreakCard(stats, colors, hide_border);
-                    return createSvgResponse(svg, 3600); // 1 hora cache
+        // Define qual usuário wakatime usar (o mesmo do github ou um específico)
+        String finalWakaUser = waka_user != null ? waka_user : username;
+
+        // Prepara a chamada do WakaTime (Hoje)
+        Mono<String> wakaTimeMono;
+
+        if (timeCoded != null && !timeCoded.isEmpty()) {
+            // Se o usuário passou manualmente na URL, usa o valor passado
+            wakaTimeMono = Mono.just(timeCoded);
+        } else {
+            // Senão, busca no WakaTime (0 dias = Hoje)
+            wakaTimeMono = wakaTimeService.getDailySummaries(finalWakaUser, 0)
+                    .map(response -> {
+                        if (response != null && response.data() != null && !response.data().isEmpty()) {
+                            // Pega o último item (hoje)
+                            var todayData = response.data().get(response.data().size() - 1);
+                            if (todayData.grandTotal() != null) {
+                                return todayData.grandTotal().text(); // Ex: "2 hrs 30 mins"
+                            }
+                        }
+                        return "";
+                    })
+                    .defaultIfEmpty("")
+                    .onErrorResume(e -> Mono.just("")); // Se der erro no waka, retorna vazio sem quebrar o streak
+        }
+
+        // Executa as duas chamadas em paralelo
+        return Mono.zip(githubService.fetchStreakStats(username), wakaTimeMono)
+                .map(tuple -> {
+                    var stats = tuple.getT1();
+                    var timeText = tuple.getT2();
+
+                    String svg = svgService.generateStreakCard(stats, colors, hide_border, timeText);
+                    return createSvgResponse(svg, 3600);
                 })
                 .onErrorResume(e -> {
                     e.printStackTrace();

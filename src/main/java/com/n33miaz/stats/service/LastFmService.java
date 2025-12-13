@@ -29,7 +29,7 @@ public class LastFmService {
     }
 
     public Mono<MusicDashboardData> getDashboardData(String username, String period) {
-        System.out.println(">>> Iniciando busca de dados para usuário: " + username + " | Periodo: " + period);
+        // System.out.println(">>> Iniciando busca de dados para usuário: " + username + " | Periodo: " + period);
 
         Mono<TrackInfo> recentTrackMono = getRecentTrack(username)
                 .flatMap(track -> getTrackPlayCount(username, track));
@@ -38,8 +38,8 @@ public class LastFmService {
         Mono<List<SimpleItem>> topAlbumsMono = getTopAlbums(username, period);
 
         return Mono.zip(recentTrackMono, topArtistsMono, topAlbumsMono)
-                .map(tuple -> new MusicDashboardData(tuple.getT1(), tuple.getT2(), tuple.getT3()))
-                .doOnSuccess(data -> System.out.println(">>> Dashboard montado com sucesso!"));
+                .map(tuple -> new MusicDashboardData(tuple.getT1(), tuple.getT2(), tuple.getT3()));
+                // .doOnSuccess(data -> System.out.println(">>> Dashboard montado com sucesso!"));
     }
 
     // --- ARTISTAS ---
@@ -220,7 +220,7 @@ public class LastFmService {
         if (isInvalidImage(url))
             return Mono.just("");
 
-        System.out.println("      -> Baixando imagem: " + url);
+        // System.out.println("      -> Baixando imagem: " + url);
         return webClient.get().uri(url).retrieve().bodyToMono(byte[].class)
                 .map(bytes -> "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(bytes))
                 .onErrorResume(e -> {

@@ -292,11 +292,12 @@ public class SvgService {
                 """.formatted(x, y, delayIndex, iconPath, label, valueStr);
     }
 
-    // --- CARD DE STREAK ---
+    // --- CARD DE STREAK (GitHub + WakaTime) ---
     public String generateStreakCard(
             com.n33miaz.stats.dto.StreakStatsDto stats,
             Map<String, String> colors,
-            boolean hideBorder) {
+            boolean hideBorder,
+            String timeCoded) {
 
         String titleColor = colors.getOrDefault("title_color", "2f80ed");
         String ringColor = colors.getOrDefault("ring", titleColor);
@@ -310,15 +311,39 @@ public class SvgService {
 
         String bgColor = colors.getOrDefault("bg_color", "fffefe");
         String borderColor = colors.getOrDefault("border_color", "e4e2e2");
+        
+        String timeBadgeColor = "39d353"; 
 
         int width = 450;
-        int height = 195;
+        int height = 220;
 
         int col1X = 75;
         int col2X = 225;
         int col3X = 375;
+        
+        int centerY = 75; 
+        int radius = 38;
+
+        // progresso do dia
+        java.time.LocalTime now = java.time.LocalTime.now();
+        int totalMinutes = now.getHour() * 60 + now.getMinute();
+        double dayProgress = (double) totalMinutes / 1440.0;
+        
+        double circumference = 2 * Math.PI * radius;
+        double strokeDashOffset = circumference * (1 - dayProgress);
 
         String fireIcon = "M 8.5 2.5 c 0 0 -2 2 -2 4.5 c 0 1.5 1 2.5 1 2.5 c 0 0 -2 -0.5 -3 -3 c -0.5 1 -1 2.5 -0.5 4 c 0.5 2 2.5 3.5 5 3 c 2 -0.5 3 -2.5 2.5 -4.5 c -0.5 -1.5 -2 -2.5 -3 -2.5 c 0 0 1 -0.5 1.5 -1 c 0.5 -0.5 0.5 -1.5 0.5 -1.5 c 0 0 -1 0 -2 -1.5 Z";
+
+        // badge de tempo
+        String timeBadgeSvg = "";
+        if (timeCoded != null && !timeCoded.isEmpty()) {
+            timeBadgeSvg = String.format("""
+                    <g transform="translate(%d, %d)">
+                        <rect x="-50" y="0" width="100" height="22" rx="11" fill="#%s" fill-opacity="0.15"/>
+                        <text x="0" y="15" text-anchor="middle" font-size="11" font-weight="600" fill="#%s">%s</text>
+                    </g>
+                    """, col2X, height - 35, timeBadgeColor, timeBadgeColor, timeCoded);
+        }
 
         return String.format(java.util.Locale.US,
                 """
@@ -329,10 +354,27 @@ public class SvgService {
                                 .stat-dte { font: 400 12px 'Segoe UI', Ubuntu, Sans-Serif; }
 
                                 .fade-in { opacity: 0; animation: fadeIn 0.8s ease-in-out forwards; }
-                                .fire-anim { animation: firePulse 2s ease-in-out infinite alternate; transform-origin: center; }
+                                
+                                .fire-anim { 
+                                    animation: firePulse 3s ease-in-out infinite; 
+                                    transform-origin: center; 
+                                    transform-box: fill-box;
+                                }
 
                                 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                                @keyframes firePulse { 0%% { opacity: 0.8; transform: scale(1); } 100%% { opacity: 1; transform: scale(1.1); } }
+                                @keyframes firePulse { 
+                                    0%% { opacity: 0.7; transform: scale(1); } 
+                                    50%% { opacity: 1; transform: scale(1.2); } 
+                                    100%% { opacity: 0.7; transform: scale(1); } 
+                                }
+                                
+                                .progress-ring {
+                                    stroke-dasharray: %f;
+                                    stroke-dashoffset: %f;
+                                    transition: stroke-dashoffset 1s ease-in-out;
+                                    transform: rotate(-90deg);
+                                    transform-origin: %dpx %dpx;
+                                }
                             </style>
 
                             <!-- Fundo -->
@@ -341,56 +383,70 @@ public class SvgService {
                             <!-- ESQUERDA -->
                             <g class="fade-in" style="animation-delay: 0.1s">
                                 <text x="%d" y="82" text-anchor="middle" class="stat-val" fill="#%s">%s</text>
-                                <text x="%d" y="108" text-anchor="middle" class="stat-lbl" fill="#%s">Commits</text>
-                                <text x="%d" y="128" text-anchor="middle" class="stat-dte" fill="#%s" opacity="0.8">Current Year</text>
+                                <text x="%d" y="115" text-anchor="middle" class="stat-lbl" fill="#%s">Commits</text>
+                                <text x="%d" y="135" text-anchor="middle" class="stat-dte" fill="#%s" opacity="0.8">Current Year</text>
                             </g>
 
                             <!-- DIVISOR -->
-                            <line x1="150" y1="40" x2="150" y2="155" stroke="#%s" stroke-width="1" stroke-opacity="0.2" />
+                            <line x1="150" y1="40" x2="150" y2="165" stroke="#%s" stroke-width="1" stroke-opacity="0.2" />
 
                             <!-- MEIO -->
                             <g class="fade-in" style="animation-delay: 0.2s">
-                                <circle cx="%d" cy="62" r="38" fill="none" stroke="#%s" stroke-width="4" stroke-opacity="0.2" />
-                                <circle cx="%d" cy="62" r="38" fill="none" stroke="#%s" stroke-width="4" stroke-dasharray="240" stroke-dashoffset="60" stroke-linecap="round" transform="rotate(-90 %d 62)"/>
+                                <!-- Anéis -->
+                                <circle cx="%d" cy="%d" r="%d" fill="none" stroke="#%s" stroke-width="4" stroke-opacity="0.2" />
+                                <circle cx="%d" cy="%d" r="%d" fill="none" stroke="#%s" stroke-width="4" stroke-linecap="round" class="progress-ring"/>
 
-                                <g transform="translate(%d, 42) scale(1.5)">
-                                    <path d="%s" fill="#%s" class="fire-anim" />
+                                <!-- Número -->
+                                <text x="%d" y="%d" text-anchor="middle" class="stat-val" fill="#%s">%d</text>
+
+                                <!-- Fogo -->
+                                <g transform="translate(%d, %d)">
+                                    <circle cx="0" cy="0" r="14" fill="#%s" />
+                                    <g transform="translate(-12, -13) scale(1.5)">
+                                        <path d="%s" fill="#%s" class="fire-anim" />
+                                    </g>
                                 </g>
 
-                                <text x="%d" y="72" text-anchor="middle" class="stat-val" fill="#%s">%d</text>
-
-                                <text x="%d" y="132" text-anchor="middle" class="stat-lbl" fill="#%s">Current Streak</text>
-                                <text x="%d" y="152" text-anchor="middle" class="stat-dte" fill="#%s" opacity="0.8">%s</text>
+                                <!-- Labels -->
+                                <text x="%d" y="%d" text-anchor="middle" class="stat-lbl" fill="#%s">Current Streak</text>
+                                <text x="%d" y="%d" text-anchor="middle" class="stat-dte" fill="#%s" opacity="0.8">%s</text>
                             </g>
 
                             <!-- DIVISOR -->
-                            <line x1="300" y1="40" x2="300" y2="155" stroke="#%s" stroke-width="1" stroke-opacity="0.2" />
+                            <line x1="300" y1="40" x2="300" y2="165" stroke="#%s" stroke-width="1" stroke-opacity="0.2" />
 
                             <!-- DIREITA -->
                             <g class="fade-in" style="animation-delay: 0.3s">
                                 <text x="%d" y="82" text-anchor="middle" class="stat-val" fill="#%s">%d</text>
-                                <text x="%d" y="108" text-anchor="middle" class="stat-lbl" fill="#%s">Longest Streak</text>
-                                <text x="%d" y="128" text-anchor="middle" class="stat-dte" fill="#%s" opacity="0.8">%s</text>
+                                <text x="%d" y="115" text-anchor="middle" class="stat-lbl" fill="#%s">Longest Streak</text>
+                                <text x="%d" y="135" text-anchor="middle" class="stat-dte" fill="#%s" opacity="0.8">%s</text>
+                            </g>
+
+                            <!-- INDICADOR DE TEMPO -->
+                            <g class="fade-in" style="animation-delay: 0.4s">
+                                %s
                             </g>
 
                         </svg>
                         """,
                 width, height, width, height,
+                circumference, strokeDashOffset, col2X, centerY,
                 width - 1, bgColor, borderColor, hideBorder ? "0" : "1",
                 col1X, sideNumsColor, kFormatter(stats.currentYearCommits()),
                 col1X, sideLabelsColor,
                 col1X, datesColor,
-                textColor,
-                col2X, ringColor,
-                col2X, ringColor, col2X,
-                col2X - 12, fireIcon, fireColor,
-                col2X, currStreakNumColor, stats.currentStreak(),
-                col2X, ringColor,
-                col2X, datesColor, stats.currentStreakRange(),
+                textColor, 
+                col2X, centerY, radius, ringColor,
+                col2X, centerY, radius, ringColor,
+                col2X, centerY + 10, currStreakNumColor, stats.currentStreak(),
+                col2X, centerY - radius, bgColor, fireIcon, fireColor,
+                col2X, centerY + 68, sideLabelsColor,
+                col2X, centerY + 88, datesColor, stats.currentStreakRange(),
                 textColor,
                 col3X, sideNumsColor, stats.longestStreak(),
                 col3X, sideLabelsColor,
-                col3X, datesColor, stats.longestStreakRange());
+                col3X, datesColor, stats.longestStreakRange(),
+                timeBadgeSvg);
     }
 
     // --- GRÁFICO DE CONTRIBUIÇÃO (GitHub + WakaTime) ---
@@ -626,12 +682,12 @@ public class SvgService {
         int col2X = dividerX + 250;
 
         int leftCenter = dividerX / 2;
-        int imgSize = 110; 
+        int imgSize = 110;
         int imgX = 25;
-        int imgY = 50;    
+        int imgY = 50;
         int textX = imgX + imgSize + 15;
-        
-        int bottomY = 180; 
+
+        int bottomY = 180;
 
         String coverImage = data.currentTrack().imageBase64().isEmpty()
                 ? renderDefaultDisk(imgX + (imgSize / 2), imgY + (imgSize / 2), imgSize / 2)
@@ -642,9 +698,9 @@ public class SvgService {
         String statusText = data.currentTrack().isPlaying() ? "NOW PLAYING" : "LAST PLAYED";
 
         // Equalizador
-        String equalizer = data.currentTrack().isPlaying() ? renderEqualizer(iconColor, textX+10, 35) : "";
+        String equalizer = data.currentTrack().isPlaying() ? renderEqualizer(iconColor, textX + 10, 35) : "";
 
-        // Plays 
+        // Plays
         String playsBadge = data.currentTrack().userPlayCount() > 0
                 ? String.format(
                         """
