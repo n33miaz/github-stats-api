@@ -182,7 +182,6 @@ public class SvgService {
         int width = 450;
         int height = 195;
         int paddingX = 25;
-        int paddingY = 35;
         int lineHeight = 28;
 
         // ícones
@@ -626,12 +625,13 @@ public class SvgService {
         int col1X = dividerX + 30;
         int col2X = dividerX + 250;
 
-        // (Imagem e Texto)
         int leftCenter = dividerX / 2;
-        int imgSize = 125;
+        int imgSize = 110; 
         int imgX = 25;
-        int imgY = 75;
+        int imgY = 50;    
         int textX = imgX + imgSize + 15;
+        
+        int bottomY = 180; 
 
         String coverImage = data.currentTrack().imageBase64().isEmpty()
                 ? renderDefaultDisk(imgX + (imgSize / 2), imgY + (imgSize / 2), imgSize / 2)
@@ -642,34 +642,35 @@ public class SvgService {
         String statusText = data.currentTrack().isPlaying() ? "NOW PLAYING" : "LAST PLAYED";
 
         // Equalizador
-        String equalizer = data.currentTrack().isPlaying() ? renderEqualizer(iconColor, textX, 50) : "";
+        String equalizer = data.currentTrack().isPlaying() ? renderEqualizer(iconColor, textX+10, 35) : "";
 
-        // Plays
+        // Plays 
         String playsBadge = data.currentTrack().userPlayCount() > 0
                 ? String.format(
                         """
-                                  <g transform="translate(%d, 240)">
+                                  <g transform="translate(%d, %d)">
                                       <rect x="-50" y="0" width="100" height="20" rx="10" fill="#%s" fill-opacity="0.15"/>
                                       <text x="0" y="14" text-anchor="middle" font-size="10" font-weight="bold" fill="#%s">%d plays</text>
                                   </g>
                                 """,
-                        leftCenter, titleColor, titleColor, data.currentTrack().userPlayCount())
+                        leftCenter, bottomY, titleColor, titleColor, data.currentTrack().userPlayCount())
                 : "";
 
-        String artistsList = renderList(data.topArtists(), col1X, 70, true, textColor, iconColor, false);
-        String albumsList = renderList(data.topAlbums(), col2X, 70, false, textColor, iconColor, true);
+        // Listas
+        String artistsList = renderList(data.topArtists(), col1X, 50, true, textColor, iconColor, false);
+        String albumsList = renderList(data.topAlbums(), col2X, 50, false, textColor, iconColor, true);
 
         // Período
         int rightCenter = dividerX + (800 - dividerX) / 2;
         String periodBadge = String.format("""
-                    <g transform="translate(%d, 240)">
+                    <g transform="translate(%d, %d)">
                         <rect x="-40" y="0" width="80" height="20" rx="10" fill="#%s" fill-opacity="0.15"/>
                         <text x="0" y="14" text-anchor="middle" font-size="10" font-weight="600" fill="#%s">%s</text>
                     </g>
-                """, rightCenter, titleColor, titleColor, periodText);
+                """, rightCenter, bottomY, titleColor, titleColor, periodText);
 
         return """
-                    <svg width="800" height="280" viewBox="0 0 800 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <svg width="800" height="215" viewBox="0 0 800 215" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <style>
                             .header { font: 700 10px 'Segoe UI', Ubuntu, Sans-Serif; letter-spacing: 1.5px; fill: #%s; opacity: 0.8; }
                             .title { font: 700 19px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; }
@@ -694,31 +695,31 @@ public class SvgService {
 
                         <!-- ESQUERDA -->
                         <g class="fade-in" style="animation-delay: 0.1s">
-                            <!-- Status Header -->
-                            <text x="%d" y="40" text-anchor="middle" class="section-header">%s</text>
+                            <!-- Status -->
+                            <text x="%d" y="30" text-anchor="middle" class="section-header">%s</text>
 
-                            <!-- Cover Image -->
+                            <!-- Imagem -->
                             %s
 
-                            <!-- Track Info (Alinhado à esquerda da imagem) -->
-                            <text x="%d" y="120" text-anchor="start" class="title">%s</text>
-                            <text x="%d" y="145" text-anchor="start" class="subtitle">%s</text>
+                            <!-- Track Info -->
+                            <text x="%d" y="90" text-anchor="start" class="title">%s</text>
+                            <text x="%d" y="115" text-anchor="start" class="subtitle">%s</text>
 
                             %s <!-- Equalizer -->
-                            %s <!-- Plays Badge -->
+                            %s <!-- Plays -->
                         </g>
 
-                        <!-- DIVIDER -->
-                        <line x1="%d" y1="40" x2="%d" y2="240" stroke="#%s" stroke-width="1" stroke-opacity="0.2" />
+                        <!-- DIVISOR -->
+                        <line x1="%d" y1="30" x2="%d" y2="%d" stroke="#%s" stroke-width="1" stroke-opacity="0.2" />
 
                         <!-- DIREITA -->
                         <g class="fade-in" style="animation-delay: 0.3s">
-                            <text x="%d" y="40" text-anchor="middle" class="section-header">Top Artists</text>
+                            <text x="%d" y="30" text-anchor="middle" class="section-header">Top Artists</text>
                             %s
                         </g>
 
                         <g class="fade-in" style="animation-delay: 0.5s">
-                            <text x="%d" y="40" text-anchor="middle" class="section-header">Top Albums</text>
+                            <text x="%d" y="30" text-anchor="middle" class="section-header">Top Albums</text>
                             %s
                         </g>
 
@@ -734,12 +735,12 @@ public class SvgService {
                         imgX, imgY, imgSize, imgSize,
                         leftCenter, statusText,
                         coverImage,
-                        textX, escapeHtml(truncate(data.currentTrack().name(), 19)),
+                        textX, escapeHtml(truncate(data.currentTrack().name(), 15)),
                         textX, escapeHtml(truncate(data.currentTrack().artist(), 25)),
                         equalizer, playsBadge,
-                        dividerX, dividerX, textColor,
-                        col1X + 80, artistsList,
-                        col2X + 80, albumsList,
+                        dividerX, dividerX, bottomY, textColor,
+                        col1X + 90, artistsList,
+                        col2X + 90, albumsList,
                         periodBadge);
     }
 
@@ -973,7 +974,7 @@ public class SvgService {
                     escapeHtml(truncate(item.title(), 20)),
                     escapeHtml(truncate(subtitle, 25))));
 
-            y += 50;
+            y += 42;
         }
         return sb.toString();
     }
