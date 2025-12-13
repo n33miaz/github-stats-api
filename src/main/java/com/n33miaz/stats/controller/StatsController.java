@@ -78,6 +78,7 @@ public class StatsController {
     @GetMapping("/stats")
     public Mono<ResponseEntity<String>> getGithubStats(
             @RequestParam String username,
+            @RequestParam(required = false) String waka_user,
             @RequestParam(required = false) String title_color,
             @RequestParam(required = false) String icon_color,
             @RequestParam(required = false) String text_color,
@@ -97,22 +98,38 @@ public class StatsController {
         if (border_color != null)
             colors.put("border_color", border_color);
 
-        return githubService.fetchUserStats(username)
-                .map(stats -> {
-                    String svg = svgService.generateStatsCard(stats, colors, hide_border);
-                    return createSvgResponse(svg, 3600); // 1 hora de cache
-                })
-                .onErrorResume(e -> {
-                    e.printStackTrace();
-                    String errorSvg = svgService.generateTestSvg("Stats Error: " + e.getMessage());
-                    return Mono.just(new ResponseEntity<>(errorSvg, HttpStatus.BAD_REQUEST));
-                });
+        String finalWakaUser = waka_user != null ? waka_user : username;
+
+        // CORREÇÃO AQUI: Tratamento de nulos seguro
+        return Mono.zip(
+                githubService.fetchUserStats(username),
+                wakaTimeService.getAllTimeStats(finalWakaUser)
+                        .map(res -> {
+                            // Verifica se data ou text são nulos antes de retornar
+                            if (res.data() != null && res.data().text() != null) {
+                                return res.data().text();
+                            }
+                            return ""; // Retorna string vazia em vez de null
+                        })
+                        .defaultIfEmpty("") // Se o serviço retornar Mono.empty() (erro de API)
+        ).map(tuple -> {
+            var stats = tuple.getT1();
+            var timeText = tuple.getT2();
+
+            // Passamos o timeText para o gerador de SVG
+            String svg = svgService.generateStatsCard(stats, colors, hide_border, timeText);
+            return createSvgResponse(svg, 3600);
+        }).onErrorResume(e -> {
+            e.printStackTrace();
+            String errorSvg = svgService.generateTestSvg("Stats Error: " + e.getMessage());
+            return Mono.just(new ResponseEntity<>(errorSvg, HttpStatus.BAD_REQUEST));
+        });
     }
 
     @GetMapping("/streak")
     public Mono<ResponseEntity<String>> getStreakStats(
             @RequestParam String username,
-            @RequestParam(required = false) String waka_user, // Opcional: caso o user do WakaTime seja diferente
+            @RequestParam(required = false) String waka_user,
             @RequestParam(required = false) String title_color,
             @RequestParam(required = false) String icon_color,
             @RequestParam(required = false) String text_color,
@@ -124,7 +141,7 @@ public class StatsController {
             @RequestParam(required = false) String sideNums,
             @RequestParam(required = false) String sideLabels,
             @RequestParam(required = false) String dates,
-            @RequestParam(required = false) String timeCoded, // Sobrescreve o automático se passado
+            @RequestParam(required = false) String timeCoded,
             @RequestParam(defaultValue = "false") boolean hide_border) {
 
         Map<String, String> colors = new HashMap<>();
@@ -163,33 +180,27 @@ public class StatsController {
         if (dates != null)
             colors.put("dates", dates);
 
-        // Define qual usuário wakatime usar (o mesmo do github ou um específico)
         String finalWakaUser = waka_user != null ? waka_user : username;
 
-        // Prepara a chamada do WakaTime (Hoje)
         Mono<String> wakaTimeMono;
 
         if (timeCoded != null && !timeCoded.isEmpty()) {
-            // Se o usuário passou manualmente na URL, usa o valor passado
             wakaTimeMono = Mono.just(timeCoded);
         } else {
-            // Senão, busca no WakaTime (0 dias = Hoje)
             wakaTimeMono = wakaTimeService.getDailySummaries(finalWakaUser, 0)
                     .map(response -> {
                         if (response != null && response.data() != null && !response.data().isEmpty()) {
-                            // Pega o último item (hoje)
                             var todayData = response.data().get(response.data().size() - 1);
                             if (todayData.grandTotal() != null) {
-                                return todayData.grandTotal().text(); // Ex: "2 hrs 30 mins"
+                                return todayData.grandTotal().text();
                             }
                         }
                         return "";
                     })
                     .defaultIfEmpty("")
-                    .onErrorResume(e -> Mono.just("")); // Se der erro no waka, retorna vazio sem quebrar o streak
+                    .onErrorResume(e -> Mono.just(""));
         }
 
-        // Executa as duas chamadas em paralelo
         return Mono.zip(githubService.fetchStreakStats(username), wakaTimeMono)
                 .map(tuple -> {
                     var stats = tuple.getT1();

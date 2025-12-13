@@ -171,8 +171,12 @@ public class SvgService {
     }
 
     // --- CARD DE ESTATÍSTICAS ---
-    public String generateStatsCard(com.n33miaz.stats.service.GithubService.StatsData stats, Map<String, String> colors,
-            boolean hideBorder) {
+    public String generateStatsCard(
+            com.n33miaz.stats.service.GithubService.StatsData stats,
+            Map<String, String> colors,
+            boolean hideBorder,
+            String timeText) {
+
         String titleColor = colors.getOrDefault("title_color", "2f80ed");
         String iconColor = colors.getOrDefault("icon_color", "4c71f2");
         String textColor = colors.getOrDefault("text_color", "434d58");
@@ -180,18 +184,17 @@ public class SvgService {
         String borderColor = colors.getOrDefault("border_color", "e4e2e2");
 
         int width = 450;
-        int height = 195;
+        int height = 220;
         int paddingX = 25;
-        int lineHeight = 28;
+        int lineHeight = 33;
 
-        // ícones
         String iconCommits = "M1.643 3.143L.427 1.927A.25.25 0 000 2.104V5.75c0 .138.112.25.25.25h3.646a.25.25 0 00.177-.427L2.715 4.215a6.5 6.5 0 11-1.18 4.458.75.75 0 10-1.493.154 8.001 8.001 0 101.6-5.684zM7.75 4a.75.75 0 01.75.75v2.992l2.028.812a.75.75 0 01-.557 1.392l-2.5-1A.75.75 0 017 8.25v-3.5A.75.75 0 017.75 4z";
         String iconPRs = "M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z";
         String iconIssues = "M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm9 3a1 1 0 11-2 0 1 1 0 012 0zm-.25-6.25a.75.75 0 00-1.5 0v3.5a.75.75 0 001.5 0v-3.5z";
         String iconContribs = "M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 110-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z";
 
         StringBuilder rowsSvg = new StringBuilder();
-        int currentY = 0;
+        int currentY = 10;
 
         rowsSvg.append(createStatRow(0, currentY, iconCommits, "Total Commits", String.valueOf(stats.commits()),
                 iconColor, textColor));
@@ -215,6 +218,22 @@ public class SvgService {
         double strokeOffset = ((100 - rankPercent) / 100) * circumference;
         String ringColor = titleColor;
 
+        // badge de tempo total
+        String timeBadgeSvg = "";
+        String timeBadgeColor = "39d353";
+        if (timeText != null && !timeText.isEmpty()) {
+            timeBadgeSvg = String.format("""
+                    <g transform="translate(%d, %d)">
+                        <rect x="-60" y="0" width="120" height="22" rx="11" fill="#%s" fill-opacity="0.15"/>
+                        <text x="0" y="15" text-anchor="middle" font-size="11" font-weight="600" fill="#%s">%s</text>
+                    </g>
+                    """,
+                    width / 2,
+                    height - 35,
+                    timeBadgeColor, timeBadgeColor,
+                    timeText);
+        }
+
         return """
                 <svg width="%d" height="%d" viewBox="0 0 %d %d" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <style>
@@ -225,7 +244,6 @@ public class SvgService {
                         .rank-text { font: 800 24px 'Segoe UI', Ubuntu, Sans-Serif; fill: #%s; dominant-baseline: central; text-anchor: middle; }
 
                         .fade-in { opacity: 0; animation: fadeIn 0.5s ease-in-out forwards; }
-
                         .delay-1 { animation-delay: 0.1s; }
                         .delay-2 { animation-delay: 0.2s; }
                         .delay-3 { animation-delay: 0.3s; }
@@ -261,6 +279,11 @@ public class SvgService {
                             <text x="40" y="40" class="rank-text">%s</text>
                         </g>
                     </g>
+
+                    <!-- tempo total -->
+                    <g class="fade-in delay-5">
+                        %s
+                    </g>
                 </svg>
                 """
                 .formatted(
@@ -268,11 +291,12 @@ public class SvgService {
                         titleColor, textColor, textColor, iconColor, textColor,
                         strokeOffset,
                         width - 1, bgColor, borderColor, hideBorder ? "0" : "1",
-                        paddingX, 55,
+                        paddingX, 45,
                         rowsSvg.toString(),
-                        width - 100 - paddingX, (height / 2) - 40,
+                        width - 100 - paddingX, (height / 2) - 50,
                         ringColor, ringColor,
-                        stats.rank().level());
+                        stats.rank().level(),
+                        timeBadgeSvg);
     }
 
     private String createStatRow(int x, int y, String iconPath, String label, String valueStr, String iconColor,
@@ -311,8 +335,8 @@ public class SvgService {
 
         String bgColor = colors.getOrDefault("bg_color", "fffefe");
         String borderColor = colors.getOrDefault("border_color", "e4e2e2");
-        
-        String timeBadgeColor = "39d353"; 
+
+        String timeBadgeColor = "39d353";
 
         int width = 450;
         int height = 220;
@@ -320,15 +344,15 @@ public class SvgService {
         int col1X = 75;
         int col2X = 225;
         int col3X = 375;
-        
-        int centerY = 75; 
+
+        int centerY = 75;
         int radius = 38;
 
         // progresso do dia
         java.time.LocalTime now = java.time.LocalTime.now();
         int totalMinutes = now.getHour() * 60 + now.getMinute();
         double dayProgress = (double) totalMinutes / 1440.0;
-        
+
         double circumference = 2 * Math.PI * radius;
         double strokeDashOffset = circumference * (1 - dayProgress);
 
@@ -354,20 +378,20 @@ public class SvgService {
                                 .stat-dte { font: 400 12px 'Segoe UI', Ubuntu, Sans-Serif; }
 
                                 .fade-in { opacity: 0; animation: fadeIn 0.8s ease-in-out forwards; }
-                                
-                                .fire-anim { 
-                                    animation: firePulse 3s ease-in-out infinite; 
-                                    transform-origin: center; 
+
+                                .fire-anim {
+                                    animation: firePulse 3s ease-in-out infinite;
+                                    transform-origin: center;
                                     transform-box: fill-box;
                                 }
 
                                 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-                                @keyframes firePulse { 
-                                    0%% { opacity: 0.7; transform: scale(1); } 
-                                    50%% { opacity: 1; transform: scale(1.2); } 
-                                    100%% { opacity: 0.7; transform: scale(1); } 
+                                @keyframes firePulse {
+                                    0%% { opacity: 0.7; transform: scale(1); }
+                                    50%% { opacity: 1; transform: scale(1.2); }
+                                    100%% { opacity: 0.7; transform: scale(1); }
                                 }
-                                
+
                                 .progress-ring {
                                     stroke-dasharray: %f;
                                     stroke-dashoffset: %f;
@@ -435,7 +459,7 @@ public class SvgService {
                 col1X, sideNumsColor, kFormatter(stats.currentYearCommits()),
                 col1X, sideLabelsColor,
                 col1X, datesColor,
-                textColor, 
+                textColor,
                 col2X, centerY, radius, ringColor,
                 col2X, centerY, radius, ringColor,
                 col2X, centerY + 10, currStreakNumColor, stats.currentStreak(),

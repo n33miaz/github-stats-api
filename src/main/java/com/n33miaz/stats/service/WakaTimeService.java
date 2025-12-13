@@ -1,5 +1,6 @@
 package com.n33miaz.stats.service;
 
+import com.n33miaz.stats.dto.WakaTimeAllTimeResponse;
 import com.n33miaz.stats.dto.WakaTimeSummaryResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,19 @@ public class WakaTimeService {
                 .bodyToMono(WakaTimeSummaryResponse.class)
                 .onErrorResume(e -> {
                     System.err.println("Erro WakaTime: " + e.getMessage());
+                    return Mono.empty();
+                });
+    }
+
+    public Mono<WakaTimeAllTimeResponse> getAllTimeStats(String username) {
+        return webClient.get()
+                .uri(uri -> uri.path("/users/{user}/all_time_since_today")
+                        .queryParam("api_key", apiKey)
+                        .build(username))
+                .retrieve()
+                .bodyToMono(WakaTimeAllTimeResponse.class)
+                .onErrorResume(e -> {
+                    System.err.println("Erro WakaTime All Time: " + e.getMessage());
                     return Mono.empty();
                 });
     }
